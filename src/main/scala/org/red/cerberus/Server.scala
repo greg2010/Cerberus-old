@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.StdIn
 
 
-object ApplicationMain extends App with LazyLogging with Base {
+object Server extends App with LazyLogging with Base {
 
   val server = Http().bindAndHandle(baseRoute, "0.0.0.0", 8080)
 

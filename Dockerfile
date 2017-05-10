@@ -1,12 +1,13 @@
-FROM openjdk:8
+FROM openjdk:8-jre-alpine
 
 RUN mkdir /red
 WORKDIR /red
 
 COPY ./target/scala-2.12/cerberus.jar cerberus.jar
 
-ADD charon.sv.conf /etc/supervisor/conf.d/
+ADD cerberus.sv.conf /etc/supervisor/conf.d/
 
-RUN apt-get update && apt-get -y -q install supervisor
+RUN apk update
+RUN apk add supervisor
 
 CMD ["/usr/bin/supervisord"]
