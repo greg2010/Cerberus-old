@@ -4,16 +4,25 @@ import org.red.cerberus.Implicits._
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import com.typesafe.scalalogging.LazyLogging
-import org.red.cerberus.ApacheLog
+import org.red.cerberus.{ApacheLog, AuthenticationHandler, Middleware}
 
 
-trait Base extends LazyLogging with ApacheLog {
+trait Base extends LazyLogging with ApacheLog with AuthenticationHandler with Middleware {
   val baseRoute =
     accessLog(logger)(system.dispatcher, timeout, materializer) {
-      path("hello") {
-        get {
-          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Say hello to akka-http</h1>"))
+      path("auth") {
+        path("login") {
+          get {
+            complete(HttpEntity(encodeJwt(generateAccessPayload(123))))
+          }
         }
-      }
+      } ~
+        path("settings") {
+          get {
+            authenticateOrRejectWithChallenge(authWithCustomJwt _) { (userId: Long) =>
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, s"<h1>Say hello to akka-http, $userId </h1>"))
+            }
+          }
+        }
     }
 }
