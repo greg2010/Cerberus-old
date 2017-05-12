@@ -10,8 +10,8 @@ import org.red.cerberus.{ApacheLog, AuthenticationHandler, Middleware}
 trait Base extends LazyLogging with ApacheLog with AuthenticationHandler with Middleware {
   val baseRoute =
     accessLog(logger)(system.dispatcher, timeout, materializer) {
-      path("auth") {
-        path("login") {
+      pathPrefix("auth") {
+        pathPrefix("login") {
           get {
             complete(HttpEntity(encodeJwt(generateAccessPayload(123))))
           }
