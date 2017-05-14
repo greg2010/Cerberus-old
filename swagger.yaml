@@ -13,22 +13,16 @@ produces:
 - application/json
 
 paths:
-  /user/login/legacy:
+  /auth/login/legacy:
     get:
       operationId: "login_legacy"
       summary: |
         Verifies user credentials using login/email and password and issues new access/refresh tokens
       parameters:
         -
-          name: name
+          name: name_or_email
           in: query
-          description: URL-encoded name of user
-          required: false
-          type: string
-        -
-          name: email
-          in: query
-          description: Email of user
+          description: URL-encoded name or email of user
           required: false
           type: string
         -
@@ -71,7 +65,7 @@ paths:
       responses:
         200:
           description: Successful response
-  /user/login/sso:
+  /auth/login/sso:
     get:
       operationId: "login_SSO"
       summary: |
@@ -115,7 +109,7 @@ paths:
       responses:
         200:
           description: Successful response
-  /user/login/refresh:
+  /auth/login/refresh:
     get:
       operationId: "refresh_auth_token"
       summary: |
@@ -136,9 +130,9 @@ paths:
             properties:
               refresh_token:
                 type: string
-  /user/signout:
+  /user/logout:
     post:
-      operationId: "signout"
+      operationId: "logout"
       summary: |
         Signs user out
       description: |
