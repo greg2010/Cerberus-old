@@ -10,7 +10,8 @@ import pdi.jwt.{JwtAlgorithm, JwtCirce, JwtClaim, JwtHeader}
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success, Try}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success}
 
 
 
@@ -41,9 +42,11 @@ trait AuthenticationHandler extends LazyLogging {
     Future {
       credentials match {
         case Some(creds) =>
-          decodeJwt(creds.token) match {
-            case Success(jwtClaim) => extractPayload(jwtClaim)
-            case Failure(_) => Left(challenge)
+          try {
+            Right(extractPayload(decodeJwt(creds.token)))
+          }
+          catch {
+            case ex: Exception if NonFatal(ex) => Left(challenge)
           }
         case _ => Left(challenge)
       }
@@ -62,16 +65,7 @@ trait AuthenticationHandler extends LazyLogging {
   }
 
   protected def extractPayloadFromToken(token: String): UserData = {
-    decodeJwt(token) match {
-      case Success(claim) =>
-        extractPayload(claim) match {
-          case Right(payload) => payload
-          case Left(_) => throw AuthenticationException("Bad JWT payload", claim.subject.getOrElse(""))
-        }
-      case Failure(ex) =>
-        logger.error("Failed to extract claim from JWT", ex)
-        throw ex
-    }
+    extractPayload(decodeJwt(token))
   }
 
   private val challenge: HttpChallenge = HttpChallenges.oAuth2("Cerberus")
@@ -98,21 +92,26 @@ trait AuthenticationHandler extends LazyLogging {
       .expiresIn(expiration)
   }
 
-  private def decodeJwt(token: String): Try[JwtClaim] = {
-    JwtCirce.decode(token, key, Seq(algorithm))
+  private def decodeJwt(token: String): JwtClaim = {
+    JwtCirce.decode(token, key, Seq(algorithm)) match {
+      case Success(jwtClaim) => jwtClaim
+      case Failure(ex) =>
+        logger.error("Failed to extract JWT", ex)
+        throw ex
+    }
   }
 
-  private def extractPayload(jwtClaim: JwtClaim): AuthenticationResult[UserData] = {
+  private def extractPayload(jwtClaim: JwtClaim): UserData = {
     jwtClaim.subject match {
       case Some(sub) => sub.asJson.as[PrivateClaim] match {
-        case Right(privateClaim) => Right(privateClaim.toUserData)
+        case Right(privateClaim) =>privateClaim.toUserData
         case Left(ex) =>
           logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
-          Left(challenge)
+          throw ex
       }
       case None =>
         logger.error("Empty JWT payload")
-        Left(challenge)
+        throw AuthenticationException("Empty JWT payload", "")
     }
   }
 }
