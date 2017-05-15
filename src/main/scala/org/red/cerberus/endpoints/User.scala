@@ -3,11 +3,10 @@ package org.red.cerberus.endpoints
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
-import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import org.red.cerberus.{AuthenticationHandler, Responses}
+import org.red.cerberus.{AuthenticationHandler, Responses, RouteHelpers}
 
 
-trait User extends AuthenticationHandler with FailFastCirceSupport with Responses {
+trait User extends RouteHelpers {
   def userEndpoints(userData: UserData): Route = pathPrefix("user") {
     path("logout") {
       post {

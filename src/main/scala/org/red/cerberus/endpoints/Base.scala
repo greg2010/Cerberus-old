@@ -1,18 +1,16 @@
 package org.red.cerberus.endpoints
 
 import org.red.cerberus.Implicits._
-import org.red.cerberus.cerberusConfig
+import org.red.cerberus._
 import akka.http.scaladsl.server.Directives._
 import com.typesafe.scalalogging.LazyLogging
-import org.red.cerberus.{ApacheLog, AuthenticationHandler, Middleware}
 
 
 trait Base extends LazyLogging
   with ApacheLog
-  with AuthenticationHandler
-  with Middleware
+  with RouteHelpers
   with Auth
-  with User{
+  with User {
   val baseRoute =
     accessLog(logger)(system.dispatcher, timeout, materializer) {
       pathPrefix(cerberusConfig.getString("basePath")) {
