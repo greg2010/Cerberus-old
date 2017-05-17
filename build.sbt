@@ -37,13 +37,14 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.7",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
+  "com.roundeights" %% "hasher" % "1.2.0",
   ("moe.pizza" % "eveapi_2.11" % "0.31").excludeAll(
     ExclusionRule(organization = "com.typesafe.slick"),
     ExclusionRule(organization = "com.typesafe.akka"),
     ExclusionRule(organization = "org.scala-lang"),
     ExclusionRule(organization = "org.scala-lang.modules")
   ),
-  "org.red" %% "reddb" % "1.0.2-SNAPSHOT",
+  "org.red" %% "reddb" % "1.0.3-SNAPSHOT",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,

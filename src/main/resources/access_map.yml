@@ -1,0 +1,9 @@
+---
+
+access_map:
+  - route: /user
+    required_permissions:
+      - registration
+  - route: /user/login
+    required_permissions:
+      - registration

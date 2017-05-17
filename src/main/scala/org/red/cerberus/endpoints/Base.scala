@@ -1,13 +1,14 @@
 package org.red.cerberus.endpoints
 
-import org.red.cerberus.Implicits._
-import org.red.cerberus._
 import akka.http.scaladsl.server.Directives._
 import com.typesafe.scalalogging.LazyLogging
+import org.red.cerberus.Implicits._
+import org.red.cerberus._
 
 
 trait Base extends LazyLogging
   with ApacheLog
+  with AuthorizationHandler
   with RouteHelpers
   with Auth
   with User {
@@ -16,7 +17,9 @@ trait Base extends LazyLogging
       pathPrefix(cerberusConfig.getString("basePath")) {
         authEndpoints ~
           authenticateOrRejectWithChallenge(authWithCustomJwt _) { userData: UserData =>
-            userEndpoints(userData)
+            authorizeAsync(customAuthorization _) {
+              userEndpoints(userData)
+            }
           }
       }
     }

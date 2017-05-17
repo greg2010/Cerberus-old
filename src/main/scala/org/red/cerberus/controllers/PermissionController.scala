@@ -6,6 +6,7 @@ import io.circe.generic.auto._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.yaml._
+import org.red.cerberus.exceptions.ResourceNotFoundException
 import org.red.db.dbAgent
 import slick.jdbc.PostgresProfile.api._
 import org.red.db.models.Coalition
@@ -30,6 +31,13 @@ object PermissionController extends LazyLogging {
     case Left(ex) =>
       logger.error("Failed to parse permissions yaml file", ex)
       throw ex
+  }
+
+  def findPermissionByName(name: String): PermissionBitEntry = {
+    permissionMap.find(_.name == name) match {
+      case Some(res) => res
+      case None => throw ResourceNotFoundException("No permission exists with such name")
+    }
   }
 
   def calculateAclPermission(characterId: Option[Long],
