@@ -3,8 +3,14 @@ package org.red.cerberus.endpoints
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.Route
 import org.red.cerberus.{AuthenticationHandler, Responses, RouteHelpers}
+import scala.concurrent.ExecutionContext.Implicits.global
 import akka.http.scaladsl.server.Directives._
 import io.circe.generic.auto._
+import moe.pizza.eveapi.ApiKey
+import org.red.cerberus.controllers.UserController
+import org.red.cerberus.external.auth.{LegacyCredentials, SSOCredentials}
+
+import scala.concurrent.Future
 
 trait Auth extends RouteHelpers {
   def authEndpoints: Route = pathPrefix("user") {
@@ -12,13 +18,28 @@ trait Auth extends RouteHelpers {
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
           complete {
-            HttpResponse(status = 200)
+            UserController.legacyLogin(nameOrEmail, password).flatMap { userData =>
+              Future {
+                DataResponse(
+                  TokenResponse(
+                    access_token = generateAccessJwt(userData),
+                    refresh_token = generateRefreshJwt(userData)
+                  )
+                )
+              }
+            }
           }
         } ~
-          (post & parameters("key_id", "verification_code", "email", "password")) {
-            (keyId, verificationCode, email, password) =>
+          (post & parameters("key_id", "verification_code", "name", "email", "password")) {
+            (keyId, verificationCode, name, email, password) =>
               complete {
-                HttpResponse(status = 200)
+                UserController.createUser(email, Some(password),
+                  LegacyCredentials(
+                    ApiKey(keyId.toInt, verificationCode),
+                    name)
+                ).map { _ =>
+                  HttpResponse(status = 201)
+                }
               }
           }
       } ~
@@ -31,7 +52,10 @@ trait Auth extends RouteHelpers {
             (post & parameters("refresh_token", "email", "password".?)) {
               (refreshToken, email, password) =>
                 complete {
-                  HttpResponse(status = 200)
+                  UserController.createUser(email, password, SSOCredentials(refreshToken)
+                  ).map { _ =>
+                    HttpResponse(status = 201)
+                  }
                 }
             }
         } ~

@@ -42,9 +42,11 @@ libraryDependencies ++= Seq(
     ExclusionRule(organization = "com.typesafe.slick"),
     ExclusionRule(organization = "com.typesafe.akka"),
     ExclusionRule(organization = "org.scala-lang"),
-    ExclusionRule(organization = "org.scala-lang.modules")
+    ExclusionRule(organization = "org.scala-lang.modules"),
+    ExclusionRule(organization = "com.fasterxml.jackson.module")
   ),
   "org.red" %% "reddb" % "1.0.3-SNAPSHOT",
+  "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,

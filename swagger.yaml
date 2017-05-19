@@ -58,13 +58,15 @@ paths:
               type: string
             verification_code:
               type: string
+            name:
+              type: string
             email:
               type: string
             password:
               type: string
       responses:
-        200:
-          description: Successful response
+        201:
+          description: User created successfully
   /auth/login/sso:
     get:
       operationId: "login_SSO"
@@ -107,8 +109,8 @@ paths:
             password:
               type: string
       responses:
-        200:
-          description: Successful response
+        201:
+          description: User created successfully
   /auth/login/refresh:
     get:
       operationId: "refresh_auth_token"

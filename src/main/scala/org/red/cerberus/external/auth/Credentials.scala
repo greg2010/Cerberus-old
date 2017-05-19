@@ -3,6 +3,7 @@ package org.red.cerberus.external.auth
 import moe.pizza.eveapi.{ApiKey, EVEAPI}
 import moe.pizza.eveapi.generated.account.APIKeyInfo.Row
 import org.red.cerberus.exceptions.ResourceNotFoundException
+import org.red.cerberus.cerberusConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -39,10 +40,11 @@ sealed trait Credentials {
 }
 
 case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials {
+  private val minimumMask: Int = cerberusConfig.getInt("legacyAPI.minimumKeyMask")
+  lazy val client = new EVEAPI()(Some(apiKey), global)
   override lazy val fetchUser: Future[EveUserData] = {
-    val xmlapi = new EVEAPI()(Some(apiKey), global)
-    xmlapi.account.APIKeyInfo().flatMap {
-      case Success(res) if res.result.key.accessMask.toString > "DEFAULT_ACCESS_MASK" =>
+    client.account.APIKeyInfo().flatMap {
+      case Success(res) if (res.result.key.accessMask & minimumMask) > 0 =>
         res.result.key.rowset.row.find(_.characterName == name) match {
           case Some(ch) => Future(EveUserData(ch))
           case None => throw ResourceNotFoundException(s"Character $name not found")
@@ -53,9 +55,8 @@ case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials {
   }
 }
 
-case class SSOCredentials(refreshToken: String) extends Credentials {
+case class SSOCredentials(refreshToken: String, accessToken: Option[String] = None) extends Credentials {
   override lazy val fetchUser: Future[EveUserData] = {
-    // do things
     Future(EveUserData(1, "", 1, "", Some(1), Some("")))
   }
 }

@@ -15,27 +15,28 @@ import scala.util.{Failure, Success}
 
 
 
+case class UserData(name: String, id: Long, characterId: Long) {
+  def toPrivateClaim: PrivateClaim = {
+    PrivateClaim(
+      nme = name,
+      id = id,
+      cid = characterId
+    )
+  }
+}
+
+case class PrivateClaim(nme: String, id: Long, cid: Long) {
+  def toUserData: UserData = {
+    UserData(
+      name = nme,
+      id = id,
+      characterId = cid
+    )
+  }
+}
+
 trait AuthenticationHandler extends LazyLogging {
 
-  case class UserData(name: String, id: Long, characterId: Long) {
-    def toPrivateClaim: PrivateClaim = {
-      PrivateClaim(
-        nme = name,
-        id = id,
-        cid = characterId
-      )
-    }
-  }
-
-  protected case class PrivateClaim(nme: String, id: Long, cid: Long) {
-    def toUserData: UserData = {
-      UserData(
-        name = nme,
-        id = id,
-        characterId = cid
-      )
-    }
-  }
 
   protected def authWithCustomJwt(credentials: Option[HttpCredentials]):
   Future[AuthenticationResult[UserData]] =
@@ -74,7 +75,7 @@ trait AuthenticationHandler extends LazyLogging {
   private val algorithm = JwtAlgorithm.HS512
   private val accessExpiration: Long = 60 * 60 * 24
   private val refreshExpiration: Long = accessExpiration * 7 * 4
-  private val key = "VERYRANDOMKEYVERYRANDOMKEYVERYRANDOMKEYVERYRANDOMKEYVERYRANDOMKEYVERYRANDOMKEY"
+  private val key = cerberusConfig.getString("JWTSecretKey")
 
   private def encodeJwt(payload: JwtClaim): String = {
     val header = JwtHeader(algorithm = algorithm)
