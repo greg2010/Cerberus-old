@@ -1,31 +1,43 @@
 package org.red.cerberus
 
-import akka.http.scaladsl.model.Uri
+import akka.http.scaladsl.model.Uri.Path
+import akka.http.scaladsl.model.{HttpMethod, HttpMethods, HttpRequest, Uri}
 import akka.http.scaladsl.server.RequestContext
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.yaml.parser
 import io.circe.generic.auto._
 import org.red.cerberus.controllers.PermissionController
 import org.red.cerberus.controllers.PermissionController.PermissionBitEntry
-import scala.concurrent.ExecutionContext.Implicits.global
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.io.Source
 
 
 trait AuthorizationHandler extends LazyLogging {
 
-  case class AccessMapEntry(route: String, required_permissions: Seq[String])
-  case class AccessMapEntryEnhanced(route: Uri, requiredPermissions: Seq[PermissionBitEntry])
+  case class AccessMapEntry(route: String, kind: String, required_permissions: Seq[String])
+  case class AccessMapEntryEnhanced(path: Path, method: Option[String], requiredPermissions: Seq[PermissionBitEntry])
   case class AccessMap(access_map: Seq[AccessMapEntry])
 
+
+  def getPermissionsForPath(path: Path): Seq[PermissionBitEntry] = {
+    def pathMatherRec(pathMatched: Path, pathToMatch: Path, permissionsMathced: Seq[PermissionBitEntry]): Seq[PermissionBitEntry] = {
+      permissionMap.filter(perm => perm.path.startsWith(pathMatched ++ pathToMatch.head))
+    }
+  }
+
   val permissionMap: Seq[AccessMapEntryEnhanced] =
-    parser.parse(Source.fromResource("permission_map.yml").getLines().mkString("\n")) match {
+    parser.parse(Source.fromResource("access_map.yml").getLines().mkString("\n")) match {
       case Right(res) =>
         res.as[AccessMap] match {
           case Right(map) => map.access_map.map { entry =>
             AccessMapEntryEnhanced(
-              route = Uri.from(queryString = Some(entry.route)),
+              path = Uri.from(path = entry.route).path,
+              method = entry.kind match {
+                case "*" => None
+                case methodName => Some(methodName)
+              },
               requiredPermissions =
                 entry
                   .required_permissions
@@ -44,7 +56,7 @@ trait AuthorizationHandler extends LazyLogging {
 
   def customAuthorization(ctx: RequestContext): Future[Boolean] = {
     Future {
-      permissionMap.find(_.route.path == ctx.unmatchedPath) match {
+      permissionMap.find(_.path == ctx.unmatchedPath) match {
         case Some(accessMapEntryEnhanced) => true //FIXME: implement actual permission check
         case None => false
       }

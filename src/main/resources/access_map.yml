@@ -1,9 +1,15 @@
 ---
 
 access_map:
-  - route: /user
+  - route: user/*
+    kind: "*"
     required_permissions:
       - registration
-  - route: /user/login
+  - route: posmon/*
+    kind: "*"
     required_permissions:
-      - registration
+      - posmon_access
+  - route: admin/*
+    kind: "*"
+    required_permissions:
+      - admin

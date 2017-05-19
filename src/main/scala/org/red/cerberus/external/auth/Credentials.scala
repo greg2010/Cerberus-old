@@ -44,7 +44,7 @@ case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials {
   lazy val client = new EVEAPI()(Some(apiKey), global)
   override lazy val fetchUser: Future[EveUserData] = {
     client.account.APIKeyInfo().flatMap {
-      case Success(res) if (res.result.key.accessMask & minimumMask) > 0 =>
+      case Success(res) if (res.result.key.accessMask & minimumMask) == minimumMask =>
         res.result.key.rowset.row.find(_.characterName == name) match {
           case Some(ch) => Future(EveUserData(ch))
           case None => throw ResourceNotFoundException(s"Character $name not found")
