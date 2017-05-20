@@ -9,3 +9,9 @@ trait RouteHelpers
     with AuthenticationHandler
     with Responses
     with FailFastCirceSupport
+
+case class LegacySignupReq(key_id: Long,
+                           verification_code: String,
+                           name: String,
+                           email: String,
+                           password: String)

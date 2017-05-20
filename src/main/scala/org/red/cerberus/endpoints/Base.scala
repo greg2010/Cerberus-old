@@ -17,7 +17,7 @@ trait Base extends LazyLogging
       pathPrefix(cerberusConfig.getString("basePath")) {
         authEndpoints ~
           authenticateOrRejectWithChallenge(authWithCustomJwt _) { userData: UserData =>
-            authorizeAsync(customAuthorization _) {
+            authorizeAsync(customAuthorization(userData) _) {
               userEndpoints(userData)
             }
           }

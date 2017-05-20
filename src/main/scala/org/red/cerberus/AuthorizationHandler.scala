@@ -1,14 +1,14 @@
 package org.red.cerberus
 
-import akka.http.scaladsl.model.Uri.Path
-import akka.http.scaladsl.model.{HttpMethod, HttpMethods, HttpRequest, Uri}
 import akka.http.scaladsl.server.RequestContext
+import com.netaporter.uri.{PathPart, Uri}
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.yaml.parser
 import io.circe.generic.auto._
 import org.red.cerberus.controllers.PermissionController
 import org.red.cerberus.controllers.PermissionController.PermissionBitEntry
 
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.io.Source
@@ -17,14 +17,30 @@ import scala.io.Source
 trait AuthorizationHandler extends LazyLogging {
 
   case class AccessMapEntry(route: String, kind: String, required_permissions: Seq[String])
-  case class AccessMapEntryEnhanced(path: Path, method: Option[String], requiredPermissions: Seq[PermissionBitEntry])
+  case class AccessMapEntryEnhanced(path: Uri, method: Option[String], requiredPermissions: Seq[PermissionBitEntry])
   case class AccessMap(access_map: Seq[AccessMapEntry])
 
 
-  def getPermissionsForPath(path: Path): Seq[PermissionBitEntry] = {
-    def pathMatherRec(pathMatched: Path, pathToMatch: Path, permissionsMathced: Seq[PermissionBitEntry]): Seq[PermissionBitEntry] = {
-      permissionMap.filter(perm => perm.path.startsWith(pathMatched ++ pathToMatch.head))
+  def getPermissionsForUri(uri: Uri): Seq[PermissionBitEntry] = {
+    @tailrec
+    def getPermissionsForUriRec(parsed: Seq[PathPart],
+                                toParse: Seq[PathPart],
+                                soFarPerm: Seq[PermissionBitEntry]
+                               ): Seq[PermissionBitEntry] = {
+      if (toParse.isEmpty) soFarPerm.distinct
+      else {
+        logger.debug(s"Parsing uri ${(parsed :+ toParse.head).mkString("/")}")
+        getPermissionsForUriRec(
+          parsed = parsed :+ toParse.head,
+          toParse = toParse.tail,
+          soFarPerm = permissionMap
+            .filter(_.path.pathParts == (parsed :+ toParse))
+            .flatMap(_.requiredPermissions)
+        )
+      }
     }
+    logger.info(s"Calculating permission list for path=${uri.path}")
+    getPermissionsForUriRec(Seq(), uri.pathParts, Seq())
   }
 
   val permissionMap: Seq[AccessMapEntryEnhanced] =
@@ -33,7 +49,7 @@ trait AuthorizationHandler extends LazyLogging {
         res.as[AccessMap] match {
           case Right(map) => map.access_map.map { entry =>
             AccessMapEntryEnhanced(
-              path = Uri.from(path = entry.route).path,
+              path = Uri.parse(entry.route),
               method = entry.kind match {
                 case "*" => None
                 case methodName => Some(methodName)
@@ -54,12 +70,15 @@ trait AuthorizationHandler extends LazyLogging {
   }
 
 
-  def customAuthorization(ctx: RequestContext): Future[Boolean] = {
+  def customAuthorization(userData: UserData)(ctx: RequestContext): Future[Boolean] = {
     Future {
-      permissionMap.find(_.path == ctx.unmatchedPath) match {
-        case Some(accessMapEntryEnhanced) => true //FIXME: implement actual permission check
-        case None => false
-      }
+      val routeBinPermission =
+        PermissionController.getBinPermissions(
+          getPermissionsForUri(Uri.parse(ctx.unmatchedPath.toString))
+        )
+      logger.info(s"Calculated path=${ctx.unmatchedPath.toString} permissions " +
+        s"pathPermission=$routeBinPermission userPermission=${userData.permissions}")
+      (routeBinPermission & userData.permissions) == userData.permissions
     }
   }
 }

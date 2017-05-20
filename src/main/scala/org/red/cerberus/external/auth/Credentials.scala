@@ -2,6 +2,7 @@ package org.red.cerberus.external.auth
 
 import moe.pizza.eveapi.{ApiKey, EVEAPI}
 import moe.pizza.eveapi.generated.account.APIKeyInfo.Row
+import org.http4s.client.blaze.PooledHttp1Client
 import org.red.cerberus.exceptions.ResourceNotFoundException
 import org.red.cerberus.cerberusConfig
 

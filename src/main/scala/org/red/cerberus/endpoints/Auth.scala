@@ -2,7 +2,8 @@ package org.red.cerberus.endpoints
 
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.Route
-import org.red.cerberus.{AuthenticationHandler, Responses, RouteHelpers}
+import org.red.cerberus.{AuthenticationHandler, LegacySignupReq, Responses, RouteHelpers}
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.http.scaladsl.server.Directives._
 import io.circe.generic.auto._
@@ -30,13 +31,12 @@ trait Auth extends RouteHelpers {
             }
           }
         } ~
-          (post & parameters("key_id", "verification_code", "name", "email", "password")) {
-            (keyId, verificationCode, name, email, password) =>
+          (post & entity(as[LegacySignupReq])) { req =>
               complete {
-                UserController.createUser(email, Some(password),
+                UserController.createUser(req.email, Some(req.password),
                   LegacyCredentials(
-                    ApiKey(keyId.toInt, verificationCode),
-                    name)
+                    ApiKey(req.key_id.toInt, req.verification_code),
+                    req.name)
                 ).map { _ =>
                   HttpResponse(status = 201)
                 }

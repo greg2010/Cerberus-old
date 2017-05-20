@@ -56,7 +56,17 @@ object PermissionController extends LazyLogging {
     }
   }
 
-  def getAclPermission(aclMask: Long): Seq[PermissionBitEntry] = {
+  def getBinPermissions(acl: Seq[PermissionBitEntry]): Long = {
+    @tailrec
+    def getBinPermissionsRec(soFar: Long,
+                             toParse: Seq[PermissionBitEntry]): Long = {
+      if (toParse.isEmpty) soFar
+      else getBinPermissionsRec(soFar + (toParse.head.bit_position << 1), toParse.tail)
+    }
+    getBinPermissionsRec(0, acl)
+  }
+
+  def getAclPermissions(aclMask: Long): Seq[PermissionBitEntry] = {
     @tailrec
     def getBitsRec(aclMask: Long, curPosn: Int, soFar: Seq[Int]): Seq[Int] = {
       val mask = 1

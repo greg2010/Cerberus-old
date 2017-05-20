@@ -65,12 +65,15 @@ object UserController extends LazyLogging {
         case (Some(u), Some(p), Some(s)) =>
           if (generatePwdHash(password, s) == p) {
             checkInUser(u.id)
-            Future {
-              UserData(
-                name = u.name,
-                id = u.id,
-                characterId = u.characterId
-              )
+            PermissionController.calculateAclPermission(Some(u.characterId), Some(0), Some(0)).flatMap { perm =>
+              Future {
+                UserData(
+                  name = u.name,
+                  id = u.id,
+                  characterId = u.characterId,
+                  permissions = perm
+                )
+              }
             }
           } else Future.failed(new RuntimeException("Bad login and/or password"))
         case _ => Future.failed(new RuntimeException("Bad login and/or password")) //FIXME: change exception type

@@ -31,20 +31,21 @@ resolvers ++=
 
 val circeVersion = "0.8.0"
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-http" % "10.0.4",
+  "com.typesafe.akka" %% "akka-http" % "10.0.6",
   "de.heikoseeberger" %% "akka-http-circe" % "1.16.0",
   "com.typesafe" % "config" % "1.3.1",
   "ch.qos.logback" % "logback-classic" % "1.1.7",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
   "com.roundeights" %% "hasher" % "1.2.0",
-  ("moe.pizza" % "eveapi_2.11" % "0.31").excludeAll(
+  ("moe.pizza" %% "eveapi" % "0.58-SNAPSHOT")/*.excludeAll(
     ExclusionRule(organization = "com.typesafe.slick"),
     ExclusionRule(organization = "com.typesafe.akka"),
     ExclusionRule(organization = "org.scala-lang"),
     ExclusionRule(organization = "org.scala-lang.modules"),
     ExclusionRule(organization = "com.fasterxml.jackson.module")
-  ),
+  )*/,
+  "io.lemonlabs" %% "scala-uri" % "0.4.16",
   "org.red" %% "reddb" % "1.0.3-SNAPSHOT",
   "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "io.circe" %% "circe-core" % circeVersion,
