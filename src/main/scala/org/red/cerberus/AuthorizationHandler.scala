@@ -21,7 +21,8 @@ trait AuthorizationHandler extends LazyLogging {
   case class AccessMap(access_map: Seq[AccessMapEntry])
 
 
-  def getPermissionsForUri(uri: Uri): Seq[PermissionBitEntry] = {
+  def getPermissionsForUri(uri: Uri, method: String): Seq[PermissionBitEntry] = {
+    val filteredPermissionMap = permissionMap.filter { entry => entry.method.isEmpty || entry.method.get == method}
     @tailrec
     def getPermissionsForUriRec(parsed: Seq[PathPart],
                                 toParse: Seq[PathPart],
@@ -33,9 +34,9 @@ trait AuthorizationHandler extends LazyLogging {
         getPermissionsForUriRec(
           parsed = parsed :+ toParse.head,
           toParse = toParse.tail,
-          soFarPerm = permissionMap
-            .filter(_.path.pathParts == (parsed :+ toParse))
-            .flatMap(_.requiredPermissions)
+          soFarPerm = filteredPermissionMap
+            .filter(_.path.pathParts == (parsed :+ toParse.head))
+            .flatMap(_.requiredPermissions) ++ soFarPerm
         )
       }
     }
@@ -74,11 +75,11 @@ trait AuthorizationHandler extends LazyLogging {
     Future {
       val routeBinPermission =
         PermissionController.getBinPermissions(
-          getPermissionsForUri(Uri.parse(ctx.unmatchedPath.toString))
+          getPermissionsForUri(Uri.parse(ctx.unmatchedPath.toString), ctx.request.method.value)
         )
       logger.info(s"Calculated path=${ctx.unmatchedPath.toString} permissions " +
         s"pathPermission=$routeBinPermission userPermission=${userData.permissions}")
-      (routeBinPermission & userData.permissions) == userData.permissions
+      (routeBinPermission & userData.permissions) == routeBinPermission
     }
   }
 }

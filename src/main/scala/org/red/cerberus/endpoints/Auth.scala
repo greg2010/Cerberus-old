@@ -2,7 +2,7 @@ package org.red.cerberus.endpoints
 
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.Route
-import org.red.cerberus.{AuthenticationHandler, LegacySignupReq, Responses, RouteHelpers}
+import org.red.cerberus._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.http.scaladsl.server.Directives._

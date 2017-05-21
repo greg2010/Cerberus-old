@@ -3,10 +3,11 @@ package org.red.cerberus
 import akka.http.scaladsl.model.headers.{HttpChallenge, HttpChallenges, HttpCredentials}
 import akka.http.scaladsl.server.Directives.AuthenticationResult
 import com.typesafe.scalalogging.LazyLogging
+import io.circe.parser
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.red.cerberus.exceptions.AuthenticationException
-import pdi.jwt.{JwtAlgorithm, JwtCirce, JwtClaim, JwtHeader}
+import pdi.jwt._
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -49,17 +50,23 @@ trait AuthenticationHandler extends LazyLogging {
             Right(extractPayload(decodeJwt(creds.token)))
           }
           catch {
-            case ex: Exception if NonFatal(ex) => Left(challenge)
+            case ex: Exception if NonFatal(ex) =>
+              logger.error("Failed to decode JWT", ex)
+              Left(challenge)
           }
-        case _ => Left(challenge)
+        case _ =>
+          logger.error("Missing auth credentials")
+          Left(challenge)
       }
     }
 
   protected def generateAccessJwt(userData: UserData): String = {
+    logger.info(s"generating access token for userId=${userData.id}")
     encodeJwt(generatePayload(userData, accessExpiration))
   }
 
   protected def generateRefreshJwt(userData: UserData): String = {
+    logger.info(s"generating refresh token for userId=${userData.id}")
     encodeJwt(generatePayload(userData, refreshExpiration))
   }
 
@@ -88,7 +95,7 @@ trait AuthenticationHandler extends LazyLogging {
     JwtClaim()
       .by(issuer)
       .to(audience)
-      .about(userData.toPrivateClaim.asJson.toString)
+      .about(userData.toPrivateClaim.asJson.noSpaces)
       .withId(java.util.UUID.randomUUID().toString)
       .issuedNow
       .startsNow
@@ -106,12 +113,13 @@ trait AuthenticationHandler extends LazyLogging {
 
   private def extractPayload(jwtClaim: JwtClaim): UserData = {
     jwtClaim.subject match {
-      case Some(sub) => sub.asJson.as[PrivateClaim] match {
-        case Right(privateClaim) =>privateClaim.toUserData
-        case Left(ex) =>
-          logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
-          throw ex
-      }
+      case Some(sub) =>
+        parser.decode[PrivateClaim](sub) match {
+          case Right(privateClaim) =>privateClaim.toUserData
+          case Left(ex) =>
+            logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
+            throw ex
+        }
       case None =>
         logger.error("Empty JWT payload")
         throw AuthenticationException("Empty JWT payload", "")

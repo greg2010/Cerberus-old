@@ -6,6 +6,7 @@ import com.roundeights.hasher.Implicits._
 import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.Implicits.dbAgent
 import org.red.cerberus.UserData
+import org.red.cerberus.exceptions.{AccessRestrictedException, AuthenticationException, ExceptionHandlers}
 import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredentials}
 import org.red.db.models.Coalition
 import slick.dbio.Effect
@@ -19,6 +20,13 @@ import scala.util.Random
 
 object UserController extends LazyLogging {
 
+  private case class DBUserData(eveUserData: EveUserData,
+                                userId: Int,
+                                password: Option[String],
+                                salt: Option[String],
+                                isBanned: Boolean)
+
+
   // TODO: add bans
   private val rsg: Stream[Char] = Random.alphanumeric
 
@@ -26,23 +34,29 @@ object UserController extends LazyLogging {
     (password + salt).sha512.toString()
   }
 
+  private def verifyPassword(pwd: String, salt: String, dbHash: String): Boolean = generatePwdHash(pwd, salt) == dbHash
+
   private def usersQuery(email: String,
                          eveUserData: EveUserData,
                          password: Option[String],
                          timestamp: Timestamp
                         ): FixedSqlAction[Int, NoStream, Effect.Write] = {
     def generateSalt: String = rsg.take(4).mkString
+
     val passwordWithSalt = password match {
       case Some(pwd) =>
         val s = generateSalt
         (Some(generatePwdHash(pwd, s)), Some(s))
       case None => (None, None)
     }
-    Coalition.Users.map(u => (u.characterId, u.name, u.email, u.password, u.salt)) +=
+
+    Coalition.Users
+      .map(u => (u.characterId, u.name, u.email, u.password, u.salt))
+      .returning(Coalition.Users.map(_.id)) +=
       (eveUserData.characterId, eveUserData.characterName, email, passwordWithSalt._1, passwordWithSalt._2)
   }
 
-  def checkInUser(userId: Long): Future[Unit] = {
+  def checkInUser(userId: Int): Future[Unit] = {
     val currentTimestamp = Some(new Timestamp(System.currentTimeMillis()))
     val query = Coalition.Users
       .filter(_.id === userId.toInt) // FIXME: change serial to bigserial
@@ -51,47 +65,90 @@ object UserController extends LazyLogging {
       case 0 => Future.failed(new RuntimeException("No user was updated!")) // FIXME: exception type
       case 1 => Future.successful {}
       case n => Future.failed(new RuntimeException("More than 1 user was updated!"))
-    }
+    }.recoverWith(ExceptionHandlers.dbExceptionHandler)
   }
 
   def legacyLogin(nameOrEmail: String, password: String): Future[UserData] = {
+
     val query = Coalition.Users
       .filter(u => u.email === nameOrEmail || u.name === nameOrEmail)
-      .take(1)
-    dbAgent.run(query.result).flatMap { res =>
-      val dbPassword = res.headOption.flatMap(u => u.password)
-      val dbSalt = res.headOption.flatMap(u => u.salt)
-      (res.headOption, dbPassword, dbSalt) match {
-        case (Some(u), Some(p), Some(s)) =>
-          if (generatePwdHash(password, s) == p) {
-            checkInUser(u.id)
-            PermissionController.calculateAclPermission(Some(u.characterId), Some(0), Some(0)).flatMap { perm =>
+      .join(Coalition.Character)
+      .on((u, ch) => u.characterId === ch.id)
+      .join(Coalition.Corporation)
+      .on((uch, corp) => uch._2.corporationId === corp.id)
+      .joinLeft(Coalition.Alliance)
+      .on((uchcorp, al) => uchcorp._2.allianceId === al.id)
+      .map(data => (
+        data._1._1._1.id,
+        data._1._1._1.characterId,
+        data._1._1._1.name,
+        data._1._2.id,
+        data._1._2.name,
+        data._1._2.allianceId,
+        data._2,
+        data._1._1._1.password,
+        data._1._1._1.salt,
+        data._1._1._1.banned)
+      ).take(1)
+    dbAgent.run(query.result)
+      .flatMap { res =>
+        res.headOption match {
+          case Some((
+            userId, charId, charName,
+            corpId, corpName, allianceId,
+            allianceRow, pwd, salt, banned)) =>
+            Future {
+              DBUserData(
+                EveUserData(
+                  charId,
+                  charName,
+                  corpId,
+                  corpName,
+                  allianceId,
+                  allianceRow.map(_.name)
+                ),
+                userId, pwd,
+                salt, banned
+              )
+            }
+          case _ => Future.failed(AuthenticationException("Bad login and/or password", ""))
+        }
+      }.flatMap { res =>
+      (res.password, res.salt) match {
+        case (Some(dbHash), Some(salt)) =>
+          if (verifyPassword(password, salt, dbHash) && !res.isBanned) {
+            checkInUser(res.userId)
+            PermissionController.calculateAclPermission(res.eveUserData).flatMap { perm =>
               Future {
                 UserData(
-                  name = u.name,
-                  id = u.id,
-                  characterId = u.characterId,
+                  name = res.eveUserData.characterName,
+                  id = res.userId,
+                  characterId = res.eveUserData.characterId,
                   permissions = perm
                 )
               }
             }
-          } else Future.failed(new RuntimeException("Bad login and/or password"))
-        case _ => Future.failed(new RuntimeException("Bad login and/or password")) //FIXME: change exception type
+          } else if (res.isBanned) Future.failed(AccessRestrictedException("User is banned"))
+          else Future.failed(AuthenticationException("Bad login and/or password", ""))
+        case _ => Future.failed(AuthenticationException("Bad login and/or password", ""))
       }
-    }
+    }.recoverWith(ExceptionHandlers.dbExceptionHandler)
   }
 
   def createUser(email: String,
-                   password: Option[String],
-                   credentials: Credentials): Future[Unit] = {
+                 password: Option[String],
+                 credentials: Credentials): Future[Unit] = {
     credentials.fetchUser.flatMap { eveUserData =>
       val currentTimestamp = new Timestamp(System.currentTimeMillis())
-      val credsQuery = credentials match {
+
+
+      def credsQuery(userId: Int) = credentials match {
         case legacy: LegacyCredentials =>
-          Coalition.EveApi.map(c => (c.keyId, c.verificationCode)) +=
-            (Some(legacy.apiKey.keyId), Some(legacy.apiKey.vCode))
+          Coalition.EveApi.map(c => (c.userId, c.characterId, c.keyId, c.verificationCode)) +=
+            (userId, eveUserData.characterId, Some(legacy.apiKey.keyId), Some(legacy.apiKey.vCode))
         case sso: SSOCredentials => Coalition.EveApi.map(_.evessoRefreshToken) += Some(sso.refreshToken)
       }
+
       val charQuery = Coalition.Character
         .insertOrUpdate(
           Coalition.CharacterRow(
@@ -99,6 +156,7 @@ object UserController extends LazyLogging {
             eveUserData.characterName,
             eveUserData.corporationId,
             currentTimestamp))
+
       val corpQuery =
         Coalition.Corporation
           .insertOrUpdate(
@@ -108,21 +166,20 @@ object UserController extends LazyLogging {
               eveUserData.allianceId,
               currentTimestamp))
 
-      lazy val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName) match {
-        case (Some(aId), Some(aName)) =>
-          dbAgent.run(Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, currentTimestamp)))
-        case (None, None) => Future.successful {}
+      val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName) match {
+        case (Some(aId), Some(aName)) => Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, currentTimestamp))
+        case (None, None) => DBIO.successful {}
         case _ => throw new RuntimeException("Alliance ID or name is present, but not both") // FIXME: change exception type
       }
-      Future.sequence {
-        Seq(
-          dbAgent.run(usersQuery(email, eveUserData, password, currentTimestamp)),
-          dbAgent.run(credsQuery),
-          dbAgent.run(charQuery),
-          dbAgent.run(corpQuery),
-          allianceQuery
-        )
-      }.map(_ => ())
+
+      val action = (for {
+        _ <- allianceQuery
+        _ <- corpQuery
+        _ <- charQuery
+        userId <- usersQuery(email, eveUserData, password, currentTimestamp)
+        _ <- credsQuery(userId)
+      } yield ()).transactionally
+      dbAgent.run(action).recoverWith(ExceptionHandlers.dbExceptionHandler)
     }
   }
 }

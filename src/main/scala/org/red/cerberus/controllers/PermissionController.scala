@@ -7,6 +7,7 @@ import io.circe.generic.auto._
 import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.yaml._
 import org.red.cerberus.exceptions.ResourceNotFoundException
+import org.red.cerberus.external.auth.EveUserData
 import org.red.db.dbAgent
 import slick.jdbc.PostgresProfile.api._
 import org.red.db.models.Coalition
@@ -56,12 +57,20 @@ object PermissionController extends LazyLogging {
     }
   }
 
+  def calculateAclPermission(eveUserData: EveUserData): Future[Long] = {
+    calculateAclPermission(
+      Some(eveUserData.characterId),
+      Some(eveUserData.corporationId),
+      eveUserData.allianceId
+    )
+  }
+
   def getBinPermissions(acl: Seq[PermissionBitEntry]): Long = {
     @tailrec
     def getBinPermissionsRec(soFar: Long,
                              toParse: Seq[PermissionBitEntry]): Long = {
       if (toParse.isEmpty) soFar
-      else getBinPermissionsRec(soFar + (toParse.head.bit_position << 1), toParse.tail)
+      else getBinPermissionsRec(soFar + (1 << toParse.head.bit_position), toParse.tail)
     }
     getBinPermissionsRec(0, acl)
   }

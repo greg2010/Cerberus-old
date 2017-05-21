@@ -38,7 +38,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
   "com.roundeights" %% "hasher" % "1.2.0",
-  ("moe.pizza" %% "eveapi" % "0.58-SNAPSHOT")/*.excludeAll(
+  "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT" /*.excludeAll(
     ExclusionRule(organization = "com.typesafe.slick"),
     ExclusionRule(organization = "com.typesafe.akka"),
     ExclusionRule(organization = "org.scala-lang"),
@@ -46,7 +46,7 @@ libraryDependencies ++= Seq(
     ExclusionRule(organization = "com.fasterxml.jackson.module")
   )*/,
   "io.lemonlabs" %% "scala-uri" % "0.4.16",
-  "org.red" %% "reddb" % "1.0.3-SNAPSHOT",
+  "org.red" %% "reddb" % "1.0.4-SNAPSHOT",
   "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,

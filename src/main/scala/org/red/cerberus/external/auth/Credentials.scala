@@ -2,8 +2,7 @@ package org.red.cerberus.external.auth
 
 import moe.pizza.eveapi.{ApiKey, EVEAPI}
 import moe.pizza.eveapi.generated.account.APIKeyInfo.Row
-import org.http4s.client.blaze.PooledHttp1Client
-import org.red.cerberus.exceptions.ResourceNotFoundException
+import org.red.cerberus.exceptions.{BadEveCredential, ResourceNotFoundException}
 import org.red.cerberus.cerberusConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -50,8 +49,8 @@ case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials {
           case Some(ch) => Future(EveUserData(ch))
           case None => throw ResourceNotFoundException(s"Character $name not found")
         }
-      case Failure(ex) => throw new RuntimeException("Bad key") // FIXME: change exception type
-      case _ => throw new RuntimeException("Bad mask")
+      case Failure(ex) => throw BadEveCredential(this, "Invalid key", -2)
+      case _ => throw BadEveCredential(this, "Invalid mask", -1)
     }
   }
 }
