@@ -38,7 +38,7 @@ object PermissionController extends LazyLogging {
   def findPermissionByName(name: String): PermissionBitEntry = {
     permissionMap.find(_.name == name) match {
       case Some(res) =>
-        logger.error(s"Permission found name=$name event=perm.find.byName.success")
+        logger.info(s"Permission found name=$name event=perm.find.byName.success")
         res
       case None =>
         logger.error(s"Permission not found name=$name event=perm.find.byName.failure")
