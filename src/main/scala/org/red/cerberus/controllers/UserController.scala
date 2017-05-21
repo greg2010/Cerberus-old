@@ -15,7 +15,7 @@ import slick.sql.FixedSqlAction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 
 object UserController extends LazyLogging {
@@ -60,11 +60,22 @@ object UserController extends LazyLogging {
     val query = Coalition.Users
       .filter(_.id === userId)
       .map(_.lastLoggedIn).update(currentTimestamp)
-    dbAgent.run(query).flatMap {
+    val f = dbAgent.run(query).flatMap {
       case 0 => Future.failed(ResourceNotFoundException("No user was updated!"))
       case 1 => Future.successful {}
       case n => Future.failed(new RuntimeException("More than 1 user was updated!"))
     }.recoverWith(ExceptionHandlers.dbExceptionHandler)
+    f.onComplete {
+      case Success(_) =>
+        logger.info(s"Successfully checked in user asynchronously " +
+          s"userId=$userId " +
+          s"event=users.checkinAsync.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to check in user asynchronously " +
+          s"userId=$userId " +
+          s"event=users.checkinAsync.failure", ex)
+    }
+    f
   }
 
   def legacyLogin(nameOrEmail: String, password: String): Future[UserData] = {
@@ -89,7 +100,7 @@ object UserController extends LazyLogging {
         data._1._1._1.salt,
         data._1._1._1.banned)
       ).take(1)
-    dbAgent.run(query.result)
+    val f = dbAgent.run(query.result)
       .flatMap { res =>
         res.headOption match {
           case Some((
@@ -132,6 +143,17 @@ object UserController extends LazyLogging {
         case _ => Future.failed(AuthenticationException("Bad login and/or password", ""))
       }
     }.recoverWith(ExceptionHandlers.dbExceptionHandler)
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Logged in user using legacy flow " +
+          s"userId=${res.id} " +
+          s"characterId=${res.characterId} " +
+          s"event=users.login.legacy.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to log in user using legacy flow " +
+          s"event=users.login.legacy.failure", ex)
+    }
+    f
   }
 
   def createUser(email: String,
@@ -177,8 +199,18 @@ object UserController extends LazyLogging {
         _ <- charQuery
         userId <- usersQuery(email, eveUserData, password, currentTimestamp)
         _ <- credsQuery(userId)
-      } yield ()).transactionally
-      dbAgent.run(action).recoverWith(ExceptionHandlers.dbExceptionHandler)
+      } yield userId).transactionally
+      val f = dbAgent.run(action).recoverWith(ExceptionHandlers.dbExceptionHandler)
+      f.onComplete {
+        case Success(res) =>
+          logger.info(s"Created new user using legacy flow " +
+            s"userId=$res " +
+            s"event=users.create.legacy.success")
+        case Failure(ex) =>
+          logger.error(s"Failed to create new user using legacy flow " +
+            s"event=users.create.legacy.failure", ex)
+      }
+      f.map(_ => ())
     }
   }
 }

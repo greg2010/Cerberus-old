@@ -1,5 +1,6 @@
 package org.red.cerberus.external.auth
 
+import com.typesafe.scalalogging.LazyLogging
 import moe.pizza.eveapi.{ApiKey, EVEAPI}
 import moe.pizza.eveapi.generated.account.APIKeyInfo.Row
 import org.red.cerberus.exceptions.{BadEveCredential, CCPException, ResourceNotFoundException}
@@ -39,11 +40,11 @@ sealed trait Credentials {
   def fetchUser: Future[EveUserData]
 }
 
-case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials {
+case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials with LazyLogging {
   private val minimumMask: Int = cerberusConfig.getInt("legacyAPI.minimumKeyMask")
   lazy val client = new EVEAPI()(Some(apiKey), global)
   override lazy val fetchUser: Future[EveUserData] = {
-    client.account.APIKeyInfo().flatMap {
+    val f = client.account.APIKeyInfo().flatMap {
       case Success(res) if (res.result.key.accessMask & minimumMask) == minimumMask =>
         res.result.key.rowset.row.find(_.characterName == name) match {
           case Some(ch) => Future(EveUserData(ch))
@@ -52,6 +53,16 @@ case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials {
       case Failure(ex) => throw BadEveCredential(this, "Invalid key", -2)
       case _ => throw BadEveCredential(this, "Invalid mask", -1)
     }
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Fetched user using legacy API " +
+          s"characterId=${res.characterId} " +
+          s"event=external.auth.legacy.fetch.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to fetch user using legacy PI " +
+          s"event=external.auth.legacy.fetch.failure", ex)
+    }
+    f
   }
 }
 
