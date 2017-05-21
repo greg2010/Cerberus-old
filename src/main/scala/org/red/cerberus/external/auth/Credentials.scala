@@ -2,7 +2,7 @@ package org.red.cerberus.external.auth
 
 import moe.pizza.eveapi.{ApiKey, EVEAPI}
 import moe.pizza.eveapi.generated.account.APIKeyInfo.Row
-import org.red.cerberus.exceptions.{BadEveCredential, ResourceNotFoundException}
+import org.red.cerberus.exceptions.{BadEveCredential, CCPException, ResourceNotFoundException}
 import org.red.cerberus.cerberusConfig
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -30,7 +30,7 @@ object EveUserData {
       )
     } catch {
       case ex: NullPointerException =>
-        throw ResourceNotFoundException(s"One of mandatory XML API fields returned null ${ex.getMessage}")
+        throw CCPException(s"One of mandatory XML API fields returned null ${ex.getMessage}")
     }
   }
 }

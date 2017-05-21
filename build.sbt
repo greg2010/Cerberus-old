@@ -38,17 +38,12 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
   "com.roundeights" %% "hasher" % "1.2.0",
-  "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT" /*.excludeAll(
-    ExclusionRule(organization = "com.typesafe.slick"),
-    ExclusionRule(organization = "com.typesafe.akka"),
-    ExclusionRule(organization = "org.scala-lang"),
-    ExclusionRule(organization = "org.scala-lang.modules"),
-    ExclusionRule(organization = "com.fasterxml.jackson.module")
-  )*/,
+  "com.github.pukkaone" % "logback-gelf" % "1.1.10",
   "io.lemonlabs" %% "scala-uri" % "0.4.16",
+  "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT",
   "org.red" %% "reddb" % "1.0.4-SNAPSHOT",
   "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
-  "io.circe" %% "circe-yaml" % "0.5.0")
+  "io.circe" %% "circe-yaml" % "0.5.0").map(_.exclude("org.slf4j", "slf4j-simple"))

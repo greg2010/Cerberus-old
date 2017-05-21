@@ -86,7 +86,7 @@ object PermissionController extends LazyLogging {
     getBitsRec(aclMask, 0, Seq()).map { bit =>
       permissionMap.find(_.bit_position == bit) match {
         case Some(entry) => entry
-        case None => throw new RuntimeException("Bad bit") //FIXME: change exception type
+        case None => throw new RuntimeException("No permission bit defn found") //FIXME: change exception type
       }
     }
   }

@@ -13,9 +13,10 @@
         <mdcIncluded>false</mdcIncluded>
         <threadIncluded>false</threadIncluded>
         <facility>gelf-java</facility>
-        <additionalField>application=scraper</additionalField>
+        <additionalField>application=cerberus</additionalField>
     </appender>
-    <root level="DEBUG">
+    <root level="info">
+        <appender-ref ref="GRAYLOG" />
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

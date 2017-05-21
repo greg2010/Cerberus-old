@@ -6,7 +6,7 @@ import com.roundeights.hasher.Implicits._
 import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.Implicits.dbAgent
 import org.red.cerberus.UserData
-import org.red.cerberus.exceptions.{AccessRestrictedException, AuthenticationException, ExceptionHandlers}
+import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredentials}
 import org.red.db.models.Coalition
 import slick.dbio.Effect
@@ -27,7 +27,6 @@ object UserController extends LazyLogging {
                                 isBanned: Boolean)
 
 
-  // TODO: add bans
   private val rsg: Stream[Char] = Random.alphanumeric
 
   private def generatePwdHash(password: String, salt: String): String = {
@@ -59,10 +58,10 @@ object UserController extends LazyLogging {
   def checkInUser(userId: Int): Future[Unit] = {
     val currentTimestamp = Some(new Timestamp(System.currentTimeMillis()))
     val query = Coalition.Users
-      .filter(_.id === userId.toInt) // FIXME: change serial to bigserial
+      .filter(_.id === userId)
       .map(_.lastLoggedIn).update(currentTimestamp)
     dbAgent.run(query).flatMap {
-      case 0 => Future.failed(new RuntimeException("No user was updated!")) // FIXME: exception type
+      case 0 => Future.failed(ResourceNotFoundException("No user was updated!"))
       case 1 => Future.successful {}
       case n => Future.failed(new RuntimeException("More than 1 user was updated!"))
     }.recoverWith(ExceptionHandlers.dbExceptionHandler)
@@ -169,7 +168,7 @@ object UserController extends LazyLogging {
       val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName) match {
         case (Some(aId), Some(aName)) => Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, currentTimestamp))
         case (None, None) => DBIO.successful {}
-        case _ => throw new RuntimeException("Alliance ID or name is present, but not both") // FIXME: change exception type
+        case _ => throw CCPException("Alliance ID or name is present, but not both")
       }
 
       val action = (for {
