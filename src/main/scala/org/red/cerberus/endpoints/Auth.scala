@@ -9,7 +9,7 @@ import akka.http.scaladsl.server.Directives._
 import io.circe.generic.auto._
 import moe.pizza.eveapi.ApiKey
 import org.red.cerberus.controllers.UserController
-import org.red.cerberus.external.auth.{LegacyCredentials, SSOCredentials}
+import org.red.cerberus.external.auth.{LegacyCredentials, SSOAuthCode, SSOCredential}
 
 import scala.concurrent.Future
 
@@ -44,6 +44,13 @@ trait Auth extends RouteHelpers {
           }
       } ~
         pathPrefix("sso") {
+          (get & parameters("code", "state")) { (code, state) =>
+            complete {
+              SSOAuthCode(code).exchangeCode.flatMap { res =>
+                UserController.createUser("", None, res)
+              }
+            }
+          } ~
           (get & parameter("token")) { token =>
             complete {
               HttpResponse(status = 200)
@@ -52,7 +59,7 @@ trait Auth extends RouteHelpers {
             (post & parameters("refresh_token", "email", "password".?)) {
               (refreshToken, email, password) =>
                 complete {
-                  UserController.createUser(email, password, SSOCredentials(refreshToken)
+                  UserController.createUser(email, password, SSOCredential(refreshToken)
                   ).map { _ =>
                     HttpResponse(status = 201)
                   }

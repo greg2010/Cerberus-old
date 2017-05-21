@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.Implicits.dbAgent
 import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
-import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredentials}
+import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredential}
 import org.red.db.models.Coalition
 import slick.dbio.Effect
 import slick.jdbc.PostgresProfile.api._
@@ -167,7 +167,7 @@ object UserController extends LazyLogging {
         case legacy: LegacyCredentials =>
           Coalition.EveApi.map(c => (c.userId, c.characterId, c.keyId, c.verificationCode)) +=
             (userId, eveUserData.characterId, Some(legacy.apiKey.keyId), Some(legacy.apiKey.vCode))
-        case sso: SSOCredentials => Coalition.EveApi.map(_.evessoRefreshToken) += Some(sso.refreshToken)
+        case sso: SSOCredential => Coalition.EveApi.map(_.evessoRefreshToken) += Some(sso.refreshToken)
       }
 
       val charQuery = Coalition.Character

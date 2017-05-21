@@ -37,6 +37,7 @@ libraryDependencies ++= Seq(
   "com.roundeights" %% "hasher" % "1.2.0",
   "com.github.pukkaone" % "logback-gelf" % "1.1.10",
   "io.lemonlabs" %% "scala-uri" % "0.4.16",
+  "org.scalaj" %% "scalaj-http" % "2.3.0",
   "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT",
   "org.red" %% "reddb" % "1.0.4-SNAPSHOT",
   "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
