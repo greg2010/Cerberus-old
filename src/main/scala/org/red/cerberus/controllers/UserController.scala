@@ -30,7 +30,7 @@ object UserController extends LazyLogging {
   private val rsg: Stream[Char] = Random.alphanumeric
 
   private def generatePwdHash(password: String, salt: String): String = {
-    (password + salt).sha512.toString()
+    (password + salt).sha512.hex
   }
 
   private def verifyPassword(pwd: String, salt: String, dbHash: String): Boolean = generatePwdHash(pwd, salt) == dbHash
