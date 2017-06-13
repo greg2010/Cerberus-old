@@ -14,7 +14,7 @@ import org.red.cerberus.external.auth.{LegacyCredentials, SSOAuthCode, SSOCreden
 import scala.concurrent.Future
 
 trait Auth extends RouteHelpers {
-  def authEndpoints: Route = pathPrefix("user") {
+  def authEndpoints: Route = pathPrefix("auth") {
     pathPrefix("login") {
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
