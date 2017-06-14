@@ -149,6 +149,8 @@ object UserController extends LazyLogging {
           s"userId=${res.id} " +
           s"characterId=${res.characterId} " +
           s"event=users.login.legacy.success")
+      case Failure(ex: AuthenticationException) =>
+        logger.error(s"Bad login or password for nameOrLogin=$nameOrEmail event=users.login.legacy.failure")
       case Failure(ex) =>
         logger.error(s"Failed to log in user using legacy flow " +
           s"event=users.login.legacy.failure", ex)

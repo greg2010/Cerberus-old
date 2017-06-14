@@ -24,7 +24,7 @@ trait ApacheLog extends BasicDirectives with MiscDirectives {
         def remoteIp = remoteAddress.flatMap(ra => ra.toOption.map(_.getHostAddress)).getOrElse("-")
 
         def method = ctx.request.method.value
-        def path = ctx.request.uri.toString
+        def path = ctx.request.uri.path.toString
         def now = {
           val n = DateTime.now
           f"${n.day}%02d/${n.monthStr}/${n.year}:${n.hour}%02d:${n.minute}%02d:${n.second}%02d -0000"

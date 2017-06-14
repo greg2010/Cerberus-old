@@ -20,7 +20,7 @@ trait Middleware extends LazyLogging with FailFastCirceSupport {
   implicit def exceptionHandler: ExceptionHandler = {
     ExceptionHandler {
       case exc @ AuthenticationException(cause, sub) =>
-        logger.warn(s"Failed to Authenticate user, offending sub=$sub", exc)
+        logger.warn(s"Failed to Authenticate user, offending sub=$sub")
         complete(HttpResponse(StatusCodes.Unauthorized, entity = ErrorResponse(s"Authentication failed, $cause")))
       case exc @ ConflictingEntityException(reason, cause) =>
         logger.error(s"Conflicting entity exception $reason", cause)
