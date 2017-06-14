@@ -4,7 +4,6 @@ import org.red.cerberus.Implicits._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.LazyLogging
-import org.quartz.impl.StdSchedulerFactory
 import org.red.cerberus.controllers.{AuthorizationController, PermissionController, ScheduleController, UserController}
 import org.red.cerberus.endpoints.Base
 
@@ -14,10 +13,12 @@ import scala.io.{Source, StdIn}
 
 object Server extends App with LazyLogging with Base {
 
-  val scheduleController = new ScheduleController
   val permissionController = new PermissionController
   val authorizationController = new AuthorizationController(permissionController)
   val userController = new UserController(permissionController)
+  val scheduleController = new ScheduleController(cerberusConfig, userController)
+
+  scheduleController.startUserDaemon()
 
   val route: Route = this.baseRoute(authorizationController, userController)
 

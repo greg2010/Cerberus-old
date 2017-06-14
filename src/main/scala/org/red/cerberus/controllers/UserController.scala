@@ -158,6 +158,38 @@ class UserController(permissionController: PermissionController)(implicit dbAgen
     f
   }
 
+  private def updateUserDataQuery(eveUserData: EveUserData): DBIOAction[Unit, NoStream, Effect.Write with Effect.Write with Effect.Write with Effect.Transactional] = {
+    val currentTimestamp = new Timestamp(System.currentTimeMillis())
+    val charQuery = Coalition.Character
+      .insertOrUpdate(
+        Coalition.CharacterRow(
+          eveUserData.characterId,
+          eveUserData.characterName,
+          eveUserData.corporationId,
+          currentTimestamp))
+
+    val corpQuery =
+      Coalition.Corporation
+        .insertOrUpdate(
+          Coalition.CorporationRow(
+            eveUserData.corporationId,
+            eveUserData.corporationName,
+            eveUserData.allianceId,
+            currentTimestamp))
+
+    val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName) match {
+      case (Some(aId), Some(aName)) => Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, currentTimestamp))
+      case (None, None) => DBIO.successful {}
+      case _ => throw CCPException("Alliance ID or name is present, but not both")
+    }
+
+    (for {
+      _ <- allianceQuery
+      _ <- corpQuery
+      _ <- charQuery
+    } yield ()).transactionally
+  }
+
   def createUser(email: String,
                  password: Option[String],
                  credentials: Credentials): Future[Unit] = {
@@ -172,33 +204,9 @@ class UserController(permissionController: PermissionController)(implicit dbAgen
         case sso: SSOCredential => Coalition.EveApi.map(_.evessoRefreshToken) += Some(sso.refreshToken)
       }
 
-      val charQuery = Coalition.Character
-        .insertOrUpdate(
-          Coalition.CharacterRow(
-            eveUserData.characterId,
-            eveUserData.characterName,
-            eveUserData.corporationId,
-            currentTimestamp))
-
-      val corpQuery =
-        Coalition.Corporation
-          .insertOrUpdate(
-            Coalition.CorporationRow(
-              eveUserData.corporationId,
-              eveUserData.corporationName,
-              eveUserData.allianceId,
-              currentTimestamp))
-
-      val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName) match {
-        case (Some(aId), Some(aName)) => Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, currentTimestamp))
-        case (None, None) => DBIO.successful {}
-        case _ => throw CCPException("Alliance ID or name is present, but not both")
-      }
 
       val action = (for {
-        _ <- allianceQuery
-        _ <- corpQuery
-        _ <- charQuery
+        _ <- updateUserDataQuery(eveUserData)
         userId <- usersQuery(email, eveUserData, password, currentTimestamp)
         _ <- credsQuery(userId)
       } yield userId).transactionally
@@ -214,5 +222,24 @@ class UserController(permissionController: PermissionController)(implicit dbAgen
       }
       f.map(_ => ())
     }
+  }
+
+
+
+  def updateUserData(eveUserData: EveUserData): Future[Unit] = {
+    val res = dbAgent.run(updateUserDataQuery(eveUserData))
+    res.onComplete {
+      case Success(_) =>
+        logger.info(s"Updated eve user info for user " +
+          s"characterId=${eveUserData.characterId} " +
+          s"characterName=${eveUserData.characterName} " +
+          s"event=user.eveData.update.success")
+      case Failure(ex) =>
+        logger.info(s"Failed to update eve user info " +
+          s"characterId=${eveUserData.characterId} " +
+          s"characterName=${eveUserData.characterName} " +
+          s"event=user.eveData.update.failure")
+    }
+    res
   }
 }
