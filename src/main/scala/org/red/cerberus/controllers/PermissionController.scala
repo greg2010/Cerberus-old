@@ -8,9 +8,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.yaml._
 import org.red.cerberus.exceptions.ResourceNotFoundException
 import org.red.cerberus.external.auth.EveUserData
-import org.red.db.dbAgent
 import slick.jdbc.PostgresProfile.api._
 import org.red.db.models.Coalition
+import slick.jdbc.JdbcBackend
 
 import scala.annotation.tailrec
 import scala.concurrent.Future
@@ -18,9 +18,10 @@ import scala.io.Source
 import scala.util.{Failure, Success}
 
 
-object PermissionController extends LazyLogging {
+case class PermissionBitEntry(name: String, bit_position: Int, description: String)
+
+class PermissionController(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
   private case class PermissionMap(permission_map: Seq[PermissionBitEntry])
-  case class PermissionBitEntry(name: String, bit_position: Int, description: String)
 
   val permissionMap: Seq[PermissionBitEntry] = parser.parse(Source.fromResource("permission_map.yml").getLines().mkString("\n")) match {
     case Right(res) =>

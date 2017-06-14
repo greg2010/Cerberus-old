@@ -13,13 +13,13 @@ import org.red.cerberus.external.auth.{LegacyCredentials, SSOAuthCode, SSOCreden
 
 import scala.concurrent.Future
 
-trait Auth extends RouteHelpers {
-  def authEndpoints: Route = pathPrefix("auth") {
+trait Auth extends RouteHelpers with AuthenticationHandler {
+  def authEndpoints(implicit userController: UserController): Route = pathPrefix("auth") {
     pathPrefix("login") {
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
           complete {
-            UserController.legacyLogin(nameOrEmail, password).flatMap { userData =>
+            userController.legacyLogin(nameOrEmail, password).flatMap { userData =>
               Future {
                 DataResponse(
                   TokenResponse(
@@ -33,7 +33,7 @@ trait Auth extends RouteHelpers {
         } ~
           (post & entity(as[LegacySignupReq])) { req =>
               complete {
-                UserController.createUser(req.email, Some(req.password),
+                userController.createUser(req.email, Some(req.password),
                   LegacyCredentials(
                     ApiKey(req.key_id.toInt, req.verification_code),
                     req.name)
@@ -47,7 +47,7 @@ trait Auth extends RouteHelpers {
           (get & parameters("code", "state")) { (code, state) =>
             complete {
               SSOAuthCode(code).exchangeCode.flatMap { res =>
-                UserController.createUser("", None, res)
+                userController.createUser("", None, res)
               }
             }
           } ~
@@ -59,7 +59,7 @@ trait Auth extends RouteHelpers {
             (post & parameters("refresh_token", "email", "password".?)) {
               (refreshToken, email, password) =>
                 complete {
-                  UserController.createUser(email, password, SSOCredential(refreshToken)
+                  userController.createUser(email, password, SSOCredential(refreshToken)
                   ).map { _ =>
                     HttpResponse(status = 201)
                   }

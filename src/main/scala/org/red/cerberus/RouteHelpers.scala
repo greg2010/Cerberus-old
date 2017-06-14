@@ -5,8 +5,6 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 
 trait RouteHelpers
   extends LazyLogging
-    with Middleware
-    with AuthenticationHandler
     with FailFastCirceSupport
 
 case class LegacySignupReq(key_id: Long,

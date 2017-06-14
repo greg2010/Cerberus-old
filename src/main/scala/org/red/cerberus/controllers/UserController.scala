@@ -4,12 +4,12 @@ import java.sql.Timestamp
 
 import com.roundeights.hasher.Implicits._
 import com.typesafe.scalalogging.LazyLogging
-import org.red.cerberus.Implicits.dbAgent
 import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredential}
 import org.red.db.models.Coalition
 import slick.dbio.Effect
+import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
 import slick.sql.FixedSqlAction
 
@@ -18,7 +18,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Random, Success}
 
 
-object UserController extends LazyLogging {
+class UserController(permissionController: PermissionController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
 
   private case class DBUserData(eveUserData: EveUserData,
                                 userId: Int,
@@ -128,7 +128,7 @@ object UserController extends LazyLogging {
         case (Some(dbHash), Some(salt)) =>
           if (verifyPassword(password, salt, dbHash) && !res.isBanned) {
             checkInUser(res.userId)
-            PermissionController.calculateAclPermission(res.eveUserData).flatMap { perm =>
+            permissionController.calculateAclPermission(res.eveUserData).flatMap { perm =>
               Future {
                 UserData(
                   name = res.eveUserData.characterName,

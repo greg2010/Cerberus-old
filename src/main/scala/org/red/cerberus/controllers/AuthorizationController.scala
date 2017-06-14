@@ -1,12 +1,11 @@
-package org.red.cerberus
+package org.red.cerberus.controllers
 
 import akka.http.scaladsl.server.RequestContext
 import com.netaporter.uri.{PathPart, Uri}
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.yaml.parser
 import io.circe.generic.auto._
-import org.red.cerberus.controllers.PermissionController
-import org.red.cerberus.controllers.PermissionController.PermissionBitEntry
+import io.circe.yaml.parser
+import org.red.cerberus.UserData
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -14,7 +13,7 @@ import scala.concurrent.Future
 import scala.io.Source
 
 
-trait AuthorizationHandler extends LazyLogging {
+class AuthorizationController(permissionController: PermissionController) extends LazyLogging {
 
   case class AccessMapEntry(route: String, kind: String, required_permissions: Seq[String])
   case class AccessMapEntryEnhanced(path: Uri, method: Option[String], requiredPermissions: Seq[PermissionBitEntry])
@@ -58,7 +57,7 @@ trait AuthorizationHandler extends LazyLogging {
               requiredPermissions =
                 entry
                   .required_permissions
-                  .map(PermissionController.findPermissionByName)
+                  .map(permissionController.findPermissionByName)
             )
           }
           case Left(ex) =>
@@ -74,7 +73,7 @@ trait AuthorizationHandler extends LazyLogging {
   def customAuthorization(userData: UserData)(ctx: RequestContext): Future[Boolean] = {
     Future {
       val routeBinPermission =
-        PermissionController.getBinPermissions(
+        permissionController.getBinPermissions(
           getPermissionsForUri(Uri.parse(ctx.unmatchedPath.toString), ctx.request.method.value)
         )
       logger.info(s"Calculated path=${ctx.unmatchedPath.toString} permissions " +
