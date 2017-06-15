@@ -1,14 +1,21 @@
 package org.red.cerberus.exceptions
 
+import com.typesafe.scalalogging.LazyLogging
 import org.postgresql.util.PSQLException
 
 import scala.concurrent.Future
+import scala.util.control.Exception.{Catch, handling}
 
 
-object ExceptionHandlers {
+object ExceptionHandlers extends LazyLogging {
   def dbExceptionHandler[T]: PartialFunction[Throwable, Future[T]] = {
     // Conflicting entities (eg duplicate unique key)
     case ex: PSQLException if ex.getSQLState == "23505" =>
       throw ConflictingEntityException(ex.getServerErrorMessage.getMessage, ex)
+  }
+
+  def jobExceptionHandler: PartialFunction[Throwable, Unit] = {
+    case ex: ClassCastException =>
+      logger.error("Failed to instantiate one or more classes event=user.schedule.failure", ex)
   }
 }

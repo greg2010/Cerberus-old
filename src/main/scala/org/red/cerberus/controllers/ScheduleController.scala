@@ -8,7 +8,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.{CronScheduleBuilder, Scheduler, SimpleScheduleBuilder, TriggerKey}
-import org.quartz.impl.StdSchedulerFactory
 import org.red.cerberus.exceptions.ResourceNotFoundException
 import org.red.cerberus.jobs.{DaemonJob, UpdateLegacyUserJob, UpdateSSOUserJob}
 import org.red.db.models.Coalition
@@ -19,13 +18,13 @@ import scala.concurrent.Future
 import scala.util.Random
 
 
-class ScheduleController(config: Config, userController: UserController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
-  val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
-  quartzScheduler.start()
+class ScheduleController(quartzScheduler: Scheduler, config: Config, userController: UserController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
+
   quartzScheduler.getContext.put("dbAgent", dbAgent)
   quartzScheduler.getContext.put("scheduleController", this)
   quartzScheduler.getContext.put("userController", userController)
   val daemonTriggerName = "userDaemon"
+  this.startUserDaemon()
 
   def startUserDaemon(): Future[Date] = Future {
     val maybeTriggerKey = new TriggerKey(daemonTriggerName, config.getString("quartzUserUpdateGroupName"))
@@ -48,14 +47,14 @@ class ScheduleController(config: Config, userController: UserController)(implici
     }
   }
 
-  def scheduleUserUpdate(user: Coalition.EveApiRow): Future[Date] = {
+  def scheduleUserUpdate(user: Coalition.EveApiRow): Future[Option[Date]] = {
     val maybeTriggerKey = new TriggerKey(user.id.toString, config.getString("quartzUserUpdateGroupName"))
     for {
       ifExists <- Future(quartzScheduler.checkExists(maybeTriggerKey))
       res <- {
         if (ifExists) {
           logger.info(s"Job already exists, skipping id=${user.id} userId=${user.userId} event=user.schedule")
-          Future(quartzScheduler.getTrigger(maybeTriggerKey).getNextFireTime)
+          Future(None)
         } else {
           logger.info(s"Job doesn't exist, scheduling id=${user.id} userId=${user.userId} event=user.schedule")
           val j = newJob()
@@ -79,19 +78,20 @@ class ScheduleController(config: Config, userController: UserController)(implici
             .map { name =>
               name.headOption match {
                 case Some(n) =>
-                  builtJob.getJobDataMap.put ("characterName", n)
+                  builtJob.getJobDataMap.put("characterName", n)
                   if (config.getInt ("quartzUserUpdateRefreshRate") > 59)
-                    throw new IllegalArgumentException ("quartzUserUpdateRefreshRate must be <60")
+                    throw new IllegalArgumentException("quartzUserUpdateRefreshRate must be <60")
 
-                  val randNum = Random.nextInt (config.getInt ("quartzUserUpdateRefreshRate") )
-                  val t = newTrigger ()
+                  val randNum = Random.nextInt(config.getInt ("quartzUserUpdateRefreshRate") )
+                  val t = newTrigger()
                     .forJob (builtJob)
+                    .withIdentity(maybeTriggerKey)
                     .withSchedule(
                       CronScheduleBuilder
-                        .cronSchedule (s"* $randNum/${config.getString ("quartzUserUpdateRefreshRate")} * * * ?")
+                        .cronSchedule(s"0 $randNum/${config.getString ("quartzUserUpdateRefreshRate")} * * * ?")
                     )
-                    .build ()
-                  val r = quartzScheduler.scheduleJob(builtJob, t)
+                    .build()
+                  val r = Some(quartzScheduler.scheduleJob(builtJob, t))
                   logger.info(s"Scheduled " +
                     s"jobId=${user.id} " +
                     s"userId=${user.userId} " +
