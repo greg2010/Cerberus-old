@@ -43,6 +43,7 @@ libraryDependencies ++= Seq(
   "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT",
   "org.red" %% "reddb" % "1.0.4-SNAPSHOT",
   "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
+  "io.monix" %% "monix" % "2.3.0",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,
