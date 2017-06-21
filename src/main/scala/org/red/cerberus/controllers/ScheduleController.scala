@@ -5,7 +5,6 @@ import java.util.Date
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
-import monix.execution.Cancelable
 import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.{CronScheduleBuilder, Scheduler, SimpleScheduleBuilder, TriggerKey}
@@ -27,7 +26,7 @@ class ScheduleController(quartzScheduler: Scheduler, config: Config, userControl
   quartzScheduler.getContext.put("scheduleController", this)
   quartzScheduler.getContext.put("userController", userController)
   val daemonTriggerName = "userDaemon"
-  private val daemonTask: Cancelable = scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
+  scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
     this.startUserDaemon()
   }
 

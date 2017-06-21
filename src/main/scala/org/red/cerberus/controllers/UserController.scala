@@ -36,6 +36,7 @@ class UserController(permissionController: PermissionController, emailController
 
 
   private val rsg: Stream[Char] = Random.alphanumeric
+  def generateSalt: String = rsg.take(4).mkString
 
   private def generatePwdHash(password: String, salt: String): String = {
     (password + salt).sha512.hex
@@ -48,7 +49,6 @@ class UserController(permissionController: PermissionController, emailController
                          password: Option[String],
                          timestamp: Timestamp
                         ): FixedSqlAction[Int, NoStream, Effect.Write] = {
-    def generateSalt: String = rsg.take(4).mkString
 
     val passwordWithSalt = password match {
       case Some(pwd) =>
@@ -251,11 +251,13 @@ class UserController(permissionController: PermissionController, emailController
     res
   }
 
+  private def deleteObsoleteQuery(id: Int): FixedSqlAction[Int, NoStream, Effect.Write] =
+    Coalition.PasswordResetRequests.filter(_.id === id).delete
+
   def initializePasswordReset(email: String): Future[MessageResponse] = {
-    // TODO: gracefully handle failure (delete token from requests table)
     def insertAndSendToken(usersRow: UsersRow, obsoleteRequestId: Option[Int]): Future[(UsersRow, MessageResponse)] = {
-      val f = obsoleteRequestId match {
-        case Some(id) => dbAgent.run(Coalition.PasswordResetRequests.filter(_.id === id).delete)
+      val deleteObsolete = obsoleteRequestId match {
+        case Some(id) => dbAgent.run(deleteObsoleteQuery(id))
         case None => Future {0}
       }
 
@@ -264,12 +266,11 @@ class UserController(permissionController: PermissionController, emailController
       val q = Coalition.PasswordResetRequests.map(r => (r.email, r.token, r.timeCreated)) +=
         (email, token, new Timestamp(System.currentTimeMillis()))
 
-      f.flatMap { _ =>
-        dbAgent.run(q).flatMap { _ =>
-          emailController.sendPasswordResetEmail(usersRow.name, usersRow.email, token)
-            .map(r => (usersRow, r))
-        }
-      }
+      for {
+        _ <- deleteObsolete
+        sendEmail <- emailController.sendPasswordResetEmail(usersRow.name, usersRow.email, token)
+        insertToken <- dbAgent.run(q)
+      } yield (usersRow, sendEmail)
     }
 
     val q = Coalition.Users.filter(_.email === email).take(1)
@@ -309,5 +310,60 @@ class UserController(permissionController: PermissionController, emailController
     }
 
     f.map(r => r._2)
+  }
+
+  def updatePassword(userId: Int, newPassword: String): Future[Unit] = {
+    val salt = generateSalt
+    val hashedPwd = generatePwdHash(newPassword, salt)
+    val q = Coalition.Users.filter(_.id === userId)
+      .map(r => (r.password, r.salt))
+      .update((Some(hashedPwd), Some(salt)))
+    val f = dbAgent.run(q).map {
+      case 0 => throw ResourceNotFoundException(s"No user with userId $userId exists")
+      case 1 =>
+        // TODO: Send email confirming reset?
+        ()
+      case n if n > 1 => throw new RuntimeException(s"$n users were updated!")
+    }
+
+    f.onComplete {
+      case Success(_) =>
+        logger.info(s"Password for user was updated userId=$userId event=user.password.update.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to update password for user userId=$userId event=user.password.update.failure", ex)
+    }
+    f
+  }
+
+  def resetPasswordWithToken(email: String, token: String, newPassword: String): Future[Unit] = {
+    val q = Coalition.Users.filter(_.email === email)
+      .joinLeft(Coalition.PasswordResetRequests).on((u, p) => u.email === p.email)
+    val f = dbAgent.run(q.result).flatMap { r =>
+      val rOpt = r.headOption
+      (rOpt.map(_._1), rOpt.flatMap(_._2)) match {
+        case (Some(usersRow), Some(passwordResetRequestsRow)) =>
+          val dbHashedToken = generatePwdHash(passwordResetRequestsRow.token, usersRow.id.toString)
+          val difference = (System.currentTimeMillis() - passwordResetRequestsRow.timeCreated.getTime).millis
+          if (dbHashedToken == token && difference < 15.minutes)
+            for {
+              upd <- this.updatePassword(usersRow.id, newPassword)
+              del <- dbAgent.run(deleteObsoleteQuery(passwordResetRequestsRow.id))
+              //TODO:  Send email confirming reset?
+            } yield usersRow
+          else
+            Future.failed(ResourceNotFoundException("No user found for this email, token expired or token doesn't match"))
+        case (None, _) =>
+          Future.failed(ResourceNotFoundException("No user found for this email, token expired or token doesn't match"))
+        case (Some(usersRow), None) =>
+          Future.failed(ResourceNotFoundException("No user found for this email, token expired or token doesn't match"))
+      }
+    }
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Completed password reset for user userId=${res.id} email=${res.email} event=user.passwordReset.complete.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to update password for user email=$email event=user.passwordReset.complete.failure", ex)
+    }
+    f.map(_ => ())
   }
 }

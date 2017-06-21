@@ -82,9 +82,12 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
             }
           } ~
             (put & entity(as[passwordChangeWithTokenReq])) { passwordChangeRequest =>
-              // TODO: implement token check and password reset logic
               complete {
-                HttpResponse(StatusCodes.OK)
+                userController.resetPasswordWithToken(
+                  passwordChangeRequest.email,
+                  passwordChangeRequest.token,
+                  passwordChangeRequest.new_password)
+                  .map(_ => HttpResponse(StatusCodes.NoContent))
               }
             }
         }

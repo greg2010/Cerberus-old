@@ -16,7 +16,7 @@ import scala.util.{Failure, Success}
 
 
 
-case class UserData(name: String, id: Long, characterId: Long, permissions: Long) {
+case class UserData(name: String, id: Int, characterId: Long, permissions: Long) {
   def toPrivateClaim: PrivateClaim = {
     PrivateClaim(
       nme = name,
@@ -27,7 +27,7 @@ case class UserData(name: String, id: Long, characterId: Long, permissions: Long
   }
 }
 
-case class PrivateClaim(nme: String, id: Long, cid: Long, prm: Long) {
+case class PrivateClaim(nme: String, id: Int, cid: Long, prm: Long) {
   def toUserData: UserData = {
     UserData(
       name = nme,
