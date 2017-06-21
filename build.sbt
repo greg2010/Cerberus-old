@@ -44,6 +44,7 @@ libraryDependencies ++= Seq(
   "io.monix" %% "monix" % "2.3.0",
   "org.matthicks" %% "mailgun4s" % "1.0.4",
   "com.osinka.i18n" %% "scala-i18n" % "1.0.2",
+  "com.gilt" %% "gfc-concurrent" % "0.3.5",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,

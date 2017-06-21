@@ -4,7 +4,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import org.quartz.{Job, JobExecutionContext}
 import org.red.cerberus.controllers.{ScheduleController, UserController}
 import org.red.cerberus.exceptions.ExceptionHandlers
-import org.red.cerberus.external.auth.SSOCredential
+import org.red.cerberus.external.auth.EveApiClient
 import slick.jdbc.JdbcBackend
 
 
@@ -17,10 +17,10 @@ class UpdateSSOUserJob extends AbstractUserJob {
       val userId = context.getMergedJobDataMap.getLong("userId")
       val characterId = context.getMergedJobDataMap.getLong("characterId")
       val characterName = context.getMergedJobDataMap.getString("characterName")
+      val eveApiClient = context.getScheduler.getContext.get("eveApiClient").asInstanceOf[EveApiClient]
       val ssoToken = context.getMergedJobDataMap.getString("ssoToken")
-      val legacyCredentials = SSOCredential(ssoToken)
-      legacyCredentials.fetchUser
-        .flatMap(userController.updateUserData)
+      eveApiClient.fetchUserAndCredentials(ssoToken)
+        .flatMap(r => userController.updateUserData(r._2))
         .onComplete(updateUserCallback(userId, characterId, characterName, CredentialsType.SSO))
     } catch { ExceptionHandlers.jobExceptionHandler }
   }

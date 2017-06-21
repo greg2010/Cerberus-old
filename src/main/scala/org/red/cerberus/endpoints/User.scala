@@ -15,7 +15,7 @@ trait User extends RouteHelpers {
       pathPrefix("logout") {
         post {
           complete {
-            HttpResponse(status = 200)
+            HttpResponse(StatusCodes.OK)
           }
         }
       } ~

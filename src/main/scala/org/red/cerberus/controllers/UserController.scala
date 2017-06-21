@@ -3,18 +3,14 @@ package org.red.cerberus.controllers
 import java.sql.Timestamp
 import java.util.UUID
 
-import com.osinka.i18n.Lang
 import com.roundeights.hasher.Implicits._
 import com.typesafe.scalalogging.LazyLogging
-import org.matthicks.mailgun.{EmailAddress, MessageResponse}
-
-import scala.concurrent.duration._
+import org.matthicks.mailgun.MessageResponse
 import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
-import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredential}
-import org.red.db.models
+import org.red.cerberus.external.auth._
 import org.red.db.models.Coalition
-import org.red.db.models.Coalition.UsersRow
+import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow}
 import slick.dbio.Effect
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
@@ -22,11 +18,11 @@ import slick.sql.FixedSqlAction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
 
-class UserController(permissionController: PermissionController, emailController: EmailController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
+class UserController(permissionController: PermissionController, emailController: EmailController, eveApiClient: EveApiClient)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
 
   private case class DBUserData(eveUserData: EveUserData,
                                 userId: Int,
@@ -201,15 +197,14 @@ class UserController(permissionController: PermissionController, emailController
   def createUser(email: String,
                  password: Option[String],
                  credentials: Credentials): Future[Unit] = {
-    credentials.fetchUser.flatMap { eveUserData =>
+    eveApiClient.fetchUser(credentials).flatMap { eveUserData =>
       val currentTimestamp = new Timestamp(System.currentTimeMillis())
-
-
+      
       def credsQuery(userId: Int) = credentials match {
         case legacy: LegacyCredentials =>
           Coalition.EveApi.map(c => (c.userId, c.characterId, c.keyId, c.verificationCode)) +=
             (userId, eveUserData.characterId, Some(legacy.apiKey.keyId), Some(legacy.apiKey.vCode))
-        case sso: SSOCredential => Coalition.EveApi.map(_.evessoRefreshToken) += Some(sso.refreshToken)
+        case sso: SSOCredentials => Coalition.EveApi.map(_.evessoRefreshToken) += Some(sso.refreshToken)
       }
 
 
@@ -260,15 +255,13 @@ class UserController(permissionController: PermissionController, emailController
         case Some(id) => dbAgent.run(deleteObsoleteQuery(id))
         case None => Future {0}
       }
-
-      implicit val lang = Lang(usersRow.languageCode)
       val token = generatePwdHash(UUID.randomUUID().toString, usersRow.id.toString)
       val q = Coalition.PasswordResetRequests.map(r => (r.email, r.token, r.timeCreated)) +=
         (email, token, new Timestamp(System.currentTimeMillis()))
 
       for {
         _ <- deleteObsolete
-        sendEmail <- emailController.sendPasswordResetEmail(usersRow.name, usersRow.email, token)
+        sendEmail <- emailController.sendPasswordResetEmail(usersRow.id, token)
         insertToken <- dbAgent.run(q)
       } yield (usersRow, sendEmail)
     }
@@ -321,8 +314,8 @@ class UserController(permissionController: PermissionController, emailController
     val f = dbAgent.run(q).map {
       case 0 => throw ResourceNotFoundException(s"No user with userId $userId exists")
       case 1 =>
-        // TODO: Send email confirming reset?
-        ()
+        emailController.sendPasswordChangeEmail(userId)
+        () // Executing email send async
       case n if n > 1 => throw new RuntimeException(s"$n users were updated!")
     }
 
@@ -336,25 +329,24 @@ class UserController(permissionController: PermissionController, emailController
   }
 
   def resetPasswordWithToken(email: String, token: String, newPassword: String): Future[Unit] = {
+    def testToken(passwordResetRequestsRow: PasswordResetRequestsRow, userId: Int): Boolean = {
+      val dbHashedToken = generatePwdHash(passwordResetRequestsRow.token, userId.toString)
+      val difference = (System.currentTimeMillis() - passwordResetRequestsRow.timeCreated.getTime).millis
+      (dbHashedToken == token) &&  difference < 15.minutes
+    }
+
     val q = Coalition.Users.filter(_.email === email)
       .joinLeft(Coalition.PasswordResetRequests).on((u, p) => u.email === p.email)
     val f = dbAgent.run(q.result).flatMap { r =>
       val rOpt = r.headOption
       (rOpt.map(_._1), rOpt.flatMap(_._2)) match {
-        case (Some(usersRow), Some(passwordResetRequestsRow)) =>
-          val dbHashedToken = generatePwdHash(passwordResetRequestsRow.token, usersRow.id.toString)
-          val difference = (System.currentTimeMillis() - passwordResetRequestsRow.timeCreated.getTime).millis
-          if (dbHashedToken == token && difference < 15.minutes)
-            for {
-              upd <- this.updatePassword(usersRow.id, newPassword)
-              del <- dbAgent.run(deleteObsoleteQuery(passwordResetRequestsRow.id))
-              //TODO:  Send email confirming reset?
-            } yield usersRow
-          else
-            Future.failed(ResourceNotFoundException("No user found for this email, token expired or token doesn't match"))
-        case (None, _) =>
-          Future.failed(ResourceNotFoundException("No user found for this email, token expired or token doesn't match"))
-        case (Some(usersRow), None) =>
+        case (Some(usersRow), Some(passwordResetRequestsRow))
+          if testToken(passwordResetRequestsRow, usersRow.id) =>
+          for {
+            upd <- this.updatePassword(usersRow.id, newPassword)
+            del <- dbAgent.run(deleteObsoleteQuery(passwordResetRequestsRow.id))
+          } yield usersRow
+        case _ =>
           Future.failed(ResourceNotFoundException("No user found for this email, token expired or token doesn't match"))
       }
     }

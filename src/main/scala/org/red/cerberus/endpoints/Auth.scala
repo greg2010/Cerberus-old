@@ -9,12 +9,12 @@ import akka.http.scaladsl.server.Directives._
 import io.circe.generic.auto._
 import moe.pizza.eveapi.ApiKey
 import org.red.cerberus.controllers.UserController
-import org.red.cerberus.external.auth.{LegacyCredentials, SSOAuthCode, SSOCredential}
+import org.red.cerberus.external.auth.{EveApiClient, LegacyCredentials, SSOAuthCode, SSOCredentials}
 
 import scala.concurrent.Future
 
 trait Auth extends RouteHelpers with AuthenticationHandler {
-  def authEndpoints(implicit userController: UserController): Route = pathPrefix("auth") {
+  def authEndpoints(implicit userController: UserController, eveApiClient: EveApiClient): Route = pathPrefix("auth") {
     pathPrefix("login") {
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
@@ -46,7 +46,8 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
         pathPrefix("sso") {
           (get & parameters("code", "state")) { (code, state) =>
             complete {
-              SSOAuthCode(code).exchangeCode.flatMap { res =>
+              eveApiClient.fetchCredentials(SSOAuthCode(code))
+                .flatMap { res =>
                 userController.createUser("", None, res)
               }
             }
@@ -59,8 +60,9 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
             (post & parameters("refresh_token", "email", "password".?)) {
               (refreshToken, email, password) =>
                 complete {
-                  userController.createUser(email, password, SSOCredential(refreshToken)
-                  ).map { _ =>
+                  eveApiClient.fetchCredentials(refreshToken).flatMap { creds =>
+                    userController.createUser(email, password, creds)
+                  }.map { _ =>
                     HttpResponse(StatusCodes.Created)
                   }
                 }

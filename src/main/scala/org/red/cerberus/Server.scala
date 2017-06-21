@@ -10,6 +10,7 @@ import org.quartz.Scheduler
 import org.quartz.impl.StdSchedulerFactory
 import org.red.cerberus.controllers._
 import org.red.cerberus.endpoints.Base
+import org.red.cerberus.external.auth.EveApiClient
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,18 +20,19 @@ import scala.io.{Source, StdIn}
 
 object Server extends App with LazyLogging with Base {
 
-  val emailController = new EmailController(cerberusConfig)
+  lazy val emailController = new EmailController(cerberusConfig)
 
-  val permissionController = new PermissionController
-  val authorizationController = new AuthorizationController(permissionController)
-  val userController = new UserController(permissionController, emailController)
+  lazy val eveApiClient = new EveApiClient(cerberusConfig)
+  lazy val permissionController = new PermissionController
+  lazy val authorizationController = new AuthorizationController(permissionController)
+  lazy val userController = new UserController(permissionController, emailController, eveApiClient)
 
   val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
   quartzScheduler.start()
   val scheduleController = new ScheduleController(quartzScheduler, cerberusConfig, userController)
 
 
-  val route: Route = this.baseRoute(authorizationController, userController)
+  val route: Route = this.baseRoute(authorizationController, userController, eveApiClient)
 
   val server = Http().bindAndHandle(route, "0.0.0.0", 8080)
   logger.debug(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
