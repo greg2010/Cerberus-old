@@ -8,10 +8,8 @@ scalaVersion := "2.12.2"
 
 assemblyJarName in assembly := "cerberus.jar"
 mainClass in assembly := Some("org.red.cerberus.Server")
+
 // Hax to get .jar to execute
-
-
-
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
   case PathList("reference.conf") => MergeStrategy.concat
@@ -41,9 +39,11 @@ libraryDependencies ++= Seq(
   "org.quartz-scheduler" % "quartz" % "2.3.0",
   "net.joelinn" % "quartz-redis-jobstore" % "1.1.8",
   "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT",
-  "org.red" %% "reddb" % "1.0.4-SNAPSHOT",
+  "org.red" %% "reddb" % "1.0.5-SNAPSHOT",
   "org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "io.monix" %% "monix" % "2.3.0",
+  "org.matthicks" %% "mailgun4s" % "1.0.4",
+  "com.osinka.i18n" %% "scala-i18n" % "1.0.2",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion,

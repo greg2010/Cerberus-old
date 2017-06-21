@@ -1,13 +1,20 @@
 package org.red.cerberus.controllers
 
 import java.sql.Timestamp
+import java.util.UUID
 
+import com.osinka.i18n.Lang
 import com.roundeights.hasher.Implicits._
 import com.typesafe.scalalogging.LazyLogging
+import org.matthicks.mailgun.{EmailAddress, MessageResponse}
+
+import scala.concurrent.duration._
 import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth.{Credentials, EveUserData, LegacyCredentials, SSOCredential}
+import org.red.db.models
 import org.red.db.models.Coalition
+import org.red.db.models.Coalition.UsersRow
 import slick.dbio.Effect
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
@@ -15,10 +22,11 @@ import slick.sql.FixedSqlAction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration.Duration
 import scala.util.{Failure, Random, Success}
 
 
-class UserController(permissionController: PermissionController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
+class UserController(permissionController: PermissionController, emailController: EmailController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
 
   private case class DBUserData(eveUserData: EveUserData,
                                 userId: Int,
@@ -241,5 +249,65 @@ class UserController(permissionController: PermissionController)(implicit dbAgen
           s"event=user.eveData.update.failure")
     }
     res
+  }
+
+  def initializePasswordReset(email: String): Future[MessageResponse] = {
+    // TODO: gracefully handle failure (delete token from requests table)
+    def insertAndSendToken(usersRow: UsersRow, obsoleteRequestId: Option[Int]): Future[(UsersRow, MessageResponse)] = {
+      val f = obsoleteRequestId match {
+        case Some(id) => dbAgent.run(Coalition.PasswordResetRequests.filter(_.id === id).delete)
+        case None => Future {0}
+      }
+
+      implicit val lang = Lang(usersRow.languageCode)
+      val token = generatePwdHash(UUID.randomUUID().toString, usersRow.id.toString)
+      val q = Coalition.PasswordResetRequests.map(r => (r.email, r.token, r.timeCreated)) +=
+        (email, token, new Timestamp(System.currentTimeMillis()))
+
+      f.flatMap { _ =>
+        dbAgent.run(q).flatMap { _ =>
+          emailController.sendPasswordResetEmail(usersRow.name, usersRow.email, token)
+            .map(r => (usersRow, r))
+        }
+      }
+    }
+
+    val q = Coalition.Users.filter(_.email === email).take(1)
+      .joinLeft(Coalition.PasswordResetRequests).on((u, p) => u.email === p.email)
+    val f = dbAgent.run(q.result).flatMap { r =>
+      val rOpt = r.headOption
+      (rOpt.map(_._1), rOpt.flatMap(_._2)) match {
+        case (Some(usersRow), None) =>
+          logger.info(s"Password reset request for " +
+            s"email=$email " +
+            s"userId=${usersRow.id} " +
+            s"characterId=${usersRow.characterId} " +
+            s"event=user.passwordReset.create")
+          insertAndSendToken(usersRow, None)
+        case (Some(usersRow), Some(passwordResetRequestsRow)) =>
+          val difference = (System.currentTimeMillis() - passwordResetRequestsRow.timeCreated.getTime).millis
+          if (difference < 15.minutes)
+            Future.failed(new IllegalStateException("This user has already requested password reset"))
+          else insertAndSendToken(usersRow, Some(passwordResetRequestsRow.id))
+        case (None, _) => Future.failed(ResourceNotFoundException(s"No user with email $email exists"))
+      }
+    }
+
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Successfully created password reset request " +
+          s"userId=${res._1.id} " +
+          s"characterId=${res._1.characterId} " +
+          s"name=${res._1.name} " +
+          s"email=${res._1.email} " +
+          s"mailgunMessageId=${res._2.id} " +
+          s"event=user.passwordReset.create.success")
+      case Failure(ex) =>
+        logger.info(s"Failed create password reset request " +
+          s"email=$email " +
+          s"event=user.passwordReset.create.failure", ex)
+    }
+
+    f.map(r => r._2)
   }
 }

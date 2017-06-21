@@ -132,7 +132,46 @@ paths:
             properties:
               refresh_token:
                 type: string
-  /user/logout:
+  /auth/password:
+    post:
+      operationId: "request_password_reset"
+      summary: |
+        Requests password reset for user by email
+      parameters:
+    - name: user_data
+      in: body
+      description: Object with user's email
+      required: true
+      schema:
+        type: object
+        properties:
+          email:
+            type: string
+      responses:
+        202:
+          description: Request accepted
+    put:
+      operationId: "password_change_with_token"
+      summary: |
+        Resets user password using token for authorization
+      parameters:
+    - name: user_data
+      in: body
+      description: Object with user's new password email and token
+      required: true
+      schema:
+        type: object
+        properties:
+          email:
+            type: string
+          token:
+            type: string
+          new_password:
+            type: string
+      responses:
+        204:
+          description: Password succesffuly reset
+  /user/self/logout:
     post:
       operationId: "logout"
       summary: |
@@ -143,3 +182,21 @@ paths:
       responses:
         200:
           description: Successful response
+  /user/self/password:
+    put:
+      operationId: "password_change_with_token"
+      summary: |
+        Resets user password
+      parameters:
+    - name: user_data
+      in: body
+      description: Object with user's new password
+      required: true
+      schema:
+        type: object
+        properties:
+          new_password:
+            type: string
+      responses:
+        204:
+          description: Password succesffuly reset

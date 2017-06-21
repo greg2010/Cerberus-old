@@ -54,6 +54,9 @@ permission_map:
   - name: "voice_server_admin"
     bit_position: 26
     description: "//sexy"
+  - name: "voice_dreadnought"
+    bit_position: 27
+    description: "Dreadnought group"
   - name: "voice_supercarrier"
     bit_position: 29
     description: "NULL"

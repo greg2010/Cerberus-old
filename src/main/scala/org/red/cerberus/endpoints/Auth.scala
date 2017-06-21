@@ -1,6 +1,6 @@
 package org.red.cerberus.endpoints
 
-import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import org.red.cerberus._
 
@@ -38,7 +38,7 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
                     ApiKey(req.key_id.toInt, req.verification_code),
                     req.name)
                 ).map { _ =>
-                  HttpResponse(status = 201)
+                  HttpResponse(StatusCodes.Created)
                 }
               }
           }
@@ -53,7 +53,7 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
           } ~
           (get & parameter("token")) { token =>
             complete {
-              HttpResponse(status = 200)
+              HttpResponse(StatusCodes.OK)
             }
           } ~
             (post & parameters("refresh_token", "email", "password".?)) {
@@ -61,7 +61,7 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
                 complete {
                   userController.createUser(email, password, SSOCredential(refreshToken)
                   ).map { _ =>
-                    HttpResponse(status = 201)
+                    HttpResponse(StatusCodes.Created)
                   }
                 }
             }
@@ -72,6 +72,21 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
               DataResponse(generateAccessJwt(extractPayloadFromToken(refreshToken)))
             }
           }
+        } ~
+        pathPrefix("password") {
+          (post & entity(as[passwordResetRequestReq])) { passwordResetRequest =>
+            complete {
+              userController.initializePasswordReset(passwordResetRequest.email)
+                // https://stackoverflow.com/a/33389526
+                .map(_ => HttpResponse(StatusCodes.Accepted))
+            }
+          } ~
+            (put & entity(as[passwordChangeWithTokenReq])) { passwordChangeRequest =>
+              // TODO: implement token check and password reset logic
+              complete {
+                HttpResponse(StatusCodes.OK)
+              }
+            }
         }
     }
   }
