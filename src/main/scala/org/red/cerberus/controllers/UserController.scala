@@ -10,7 +10,7 @@ import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth._
 import org.red.db.models.Coalition
-import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow}
+import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow, UsersViewRow}
 import slick.dbio.Effect
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
@@ -21,14 +21,44 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
+case class User(eveUserData: EveUserData,
+                userId: Int,
+                email: String,
+                password: Option[String],
+                salt: Option[String],
+                isBanned: Boolean,
+                creationTime: Timestamp,
+                lastLoggedIn: Timestamp,
+                languageCode: String)
+
+object User {
+  def apply(usersViewRow: UsersViewRow): User = {
+    // TODO: raise postgres exception on failed get
+    val eveUserData = EveUserData(
+      characterId = usersViewRow.characterId.get,
+      characterName = usersViewRow.characterName.get,
+      corporationId = usersViewRow.corporationId.get,
+      corporationName = usersViewRow.corporationName.get,
+      allianceId = usersViewRow.allianceId,
+      allianceName = usersViewRow.allianceName
+    )
+    User(
+      eveUserData = eveUserData,
+      userId = usersViewRow.userId.get,
+      email = usersViewRow.email.get,
+      password = usersViewRow.password,
+      salt = usersViewRow.salt,
+      isBanned = usersViewRow.banned.get,
+      creationTime = usersViewRow.creationTime.get,
+      lastLoggedIn = usersViewRow.lastLoggedIn.get,
+      languageCode = usersViewRow.languageCode.get
+    )
+  }
+}
 
 class UserController(permissionController: PermissionController, emailController: EmailController, eveApiClient: EveApiClient)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
 
-  private case class DBUserData(eveUserData: EveUserData,
-                                userId: Int,
-                                password: Option[String],
-                                salt: Option[String],
-                                isBanned: Boolean)
+
 
 
   private val rsg: Stream[Char] = Random.alphanumeric
@@ -84,46 +114,15 @@ class UserController(permissionController: PermissionController, emailController
 
   def legacyLogin(nameOrEmail: String, password: String): Future[UserData] = {
 
-    val query = Coalition.Users
-      .filter(u => u.email === nameOrEmail || u.name === nameOrEmail)
-      .join(Coalition.Character)
-      .on((u, ch) => u.characterId === ch.id)
-      .join(Coalition.Corporation)
-      .on((uch, corp) => uch._2.corporationId === corp.id)
-      .joinLeft(Coalition.Alliance)
-      .on((uchcorp, al) => uchcorp._2.allianceId === al.id)
-      .map(data => (
-        data._1._1._1.id,
-        data._1._1._1.characterId,
-        data._1._1._1.name,
-        data._1._2.id,
-        data._1._2.name,
-        data._1._2.allianceId,
-        data._2,
-        data._1._1._1.password,
-        data._1._1._1.salt,
-        data._1._1._1.banned)
-      ).take(1)
+    val query = Coalition.UsersView
+      .filter(u => u.email === nameOrEmail || u.characterName === nameOrEmail)
+      .take(1)
     val f = dbAgent.run(query.result)
       .flatMap { res =>
         res.headOption match {
-          case Some((
-            userId, charId, charName,
-            corpId, corpName, allianceId,
-            allianceRow, pwd, salt, banned)) =>
+          case Some(usersViewRow) =>
             Future {
-              DBUserData(
-                EveUserData(
-                  charId,
-                  charName,
-                  corpId,
-                  corpName,
-                  allianceId,
-                  allianceRow.map(_.name)
-                ),
-                userId, pwd,
-                salt, banned
-              )
+              User(usersViewRow)
             }
           case _ => Future.failed(AuthenticationException("Bad login and/or password", ""))
         }
@@ -227,6 +226,15 @@ class UserController(permissionController: PermissionController, emailController
     }
   }
 
+
+  def getUser(userId: Int): Future[User] = {
+    dbAgent.run(Coalition.UsersView.filter(_.userId === userId).take(1).result).map { u =>
+      u.headOption match {
+        case Some(uRow) => User(uRow)
+        case None => throw ResourceNotFoundException(s"No user found with id $userId")
+      }
+    }
+  }
 
 
   def updateUserData(eveUserData: EveUserData): Future[Unit] = {

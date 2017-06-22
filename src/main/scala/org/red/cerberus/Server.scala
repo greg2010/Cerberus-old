@@ -20,12 +20,12 @@ import scala.io.{Source, StdIn}
 
 object Server extends App with LazyLogging with Base {
 
-  lazy val emailController = new EmailController(cerberusConfig)
+  lazy val emailController: EmailController = new EmailController(cerberusConfig, userController)
 
-  lazy val eveApiClient = new EveApiClient(cerberusConfig)
-  lazy val permissionController = new PermissionController
-  lazy val authorizationController = new AuthorizationController(permissionController)
-  lazy val userController = new UserController(permissionController, emailController, eveApiClient)
+  lazy val eveApiClient: EveApiClient = new EveApiClient(cerberusConfig)
+  lazy val permissionController: PermissionController = new PermissionController
+  lazy val authorizationController: AuthorizationController = new AuthorizationController(permissionController)
+  lazy val userController: UserController = new UserController(permissionController, emailController, eveApiClient)
 
   val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
   quartzScheduler.start()

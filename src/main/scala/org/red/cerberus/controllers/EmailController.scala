@@ -4,10 +4,6 @@ import com.osinka.i18n.{Lang, Messages}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.matthicks.mailgun.{EmailAddress, Mailgun, Message, MessageResponse}
-import org.red.cerberus.exceptions.ResourceNotFoundException
-import slick.jdbc.PostgresProfile.api._
-import org.red.db.models.Coalition
-import slick.jdbc.JdbcBackend
 import scala.concurrent.duration._
 import com.gilt.gfc.concurrent.ScalaFutures._
 
@@ -16,7 +12,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 
-class EmailController(config: Config)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
+class EmailController(config: Config, userController: UserController) extends LazyLogging {
   private val mailer = new Mailgun(config.getString("mailer.domain"), config.getString("mailer.apiKey"))
   private val defaultEmailSender = EmailAddress(
     config.getString("mailer.defaultSenderEmail"),
@@ -63,18 +59,15 @@ class EmailController(config: Config)(implicit dbAgent: JdbcBackend.Database) ex
   }
 
   def sendPasswordResetEmail(userId: Int, token: String): Future[MessageResponse] = {
-    val f = dbAgent.run(Coalition.Users.filter(_.id === userId).result)
-      .flatMap { _.headOption match {
-        case Some(res) =>
-          implicit val lang: Lang = Lang(res.languageCode)
-          val dest = EmailAddress (res.email, res.name)
-          val subject = Messages ("email.reset.subject", config.getString ("mailer.defaultSenderAlias"))
+    val f = userController.getUser(userId).flatMap { res =>
+      implicit val lang: Lang = Lang(res.languageCode)
+      val dest = EmailAddress (res.email, res.eveUserData.characterName)
+      val subject = Messages ("email.reset.subject", config.getString ("mailer.defaultSenderAlias"))
+      val link = "https://" + config.getString ("mailer.defaultResetDomain") + "/" + token
+      val body = Messages ("email.reset.body", res.eveUserData.characterName, config.getString ("mailer.defaultSenderAlias"), link)
+      this.send("reset")(dest, subject, body)
+    }
 
-          val link = "https://" + config.getString ("mailer.defaultResetDomain") + "/" + token
-          val body = Messages ("email.reset.body", res.name, config.getString ("mailer.defaultSenderAlias"), link)
-          this.send("reset")(dest, subject, body)
-        case None => Future.failed(ResourceNotFoundException(s"No user with id $userId exists"))
-      }}
     f.onComplete {
       case Success(r) =>
         logger.info(s"Successfully sent password reset email for userId=$userId event=email.reset.sent")
@@ -85,16 +78,13 @@ class EmailController(config: Config)(implicit dbAgent: JdbcBackend.Database) ex
   }
 
   def sendPasswordChangeEmail(userId: Int): Future[MessageResponse] = {
-    val f = dbAgent.run(Coalition.Users.filter(_.id === userId).result)
-      .flatMap {_.headOption match {
-        case Some(res) =>
-          implicit val lang: Lang = Lang(res.languageCode)
-          val dest = EmailAddress(res.email, res.name)
-          val subject = Messages("email.passwordChange.subject", config.getString("mailer.defaultSenderAlias"))
-          val body = Messages("email.passwordChange.body", res.name, config.getString("mailer.defaultSenderAlias"))
-          this.send("change")(dest, subject, body)
-        case None => Future.failed(ResourceNotFoundException(s"No user with id $userId exists"))
-      }}
+    val f = userController.getUser(userId).flatMap { res =>
+      implicit val lang: Lang = Lang(res.languageCode)
+      val dest = EmailAddress(res.email, res.eveUserData.characterName)
+      val subject = Messages("email.passwordChange.subject", config.getString("mailer.defaultSenderAlias"))
+      val body = Messages("email.passwordChange.body", res.eveUserData.characterName, config.getString("mailer.defaultSenderAlias"))
+      this.send("change")(dest, subject, body)
+    }
 
     f.onComplete {
       case Success(r) =>
