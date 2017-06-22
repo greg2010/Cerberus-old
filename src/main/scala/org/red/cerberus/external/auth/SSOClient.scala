@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import scalaj.http.{Http, HttpRequest}
 
 
-private [this] class SSOClient(config: Config) extends LazyLogging {
+private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient) extends LazyLogging {
   private val defaultDatasource = Some("tranquility")
   private val baseUrl = "https://login.eveonline.com/oauth"
   private val userAgent = "red-cerberus/1.0"
@@ -58,7 +58,7 @@ private [this] class SSOClient(config: Config) extends LazyLogging {
   }
 
 
-  private def executeQueryAsync[T](httpRequest: HttpRequest,
+  private def executeAsync[T](httpRequest: HttpRequest,
                                    parser: (Int, Map[String, IndexedSeq[String]], InputStream) => T) = {
     retryWithExponentialDelay(
       maxRetryTimes = 3,
@@ -77,7 +77,7 @@ private [this] class SSOClient(config: Config) extends LazyLogging {
           ("code", SSOAuthCode.code)
         }
       )
-    this.executeQueryAsync[TokenResponse](
+    this.executeAsync[TokenResponse](
       q,
       parseResponse[TokenResponse]
     ).map { res =>
@@ -93,7 +93,7 @@ private [this] class SSOClient(config: Config) extends LazyLogging {
           ("refresh_token", refreshToken)
         }
       )
-    this.executeQueryAsync[TokenResponse](q, parseResponse[TokenResponse]).map { res =>
+    this.executeAsync[TokenResponse](q, parseResponse[TokenResponse]).map { res =>
       SSOCredentials(refreshToken, res.access_token)
     }
   }
@@ -104,49 +104,7 @@ private [this] class SSOClient(config: Config) extends LazyLogging {
         .method("GET")
         .header("User-Agent", userAgent)
         .header("Authorization", s"Bearer ${credential.accessToken}")
-    val tokenInfo =
-      this.executeQueryAsync[VerifyResponse](q, parseResponse[VerifyResponse])
-    for {
-      char <- tokenInfo
-      exCharInfo <- Future {
-        esiCharClient
-          .getCharactersCharacterId(
-            char.CharacterID.toInt,
-            datasource = defaultDatasource
-          ) match {
-          case Some(resp) => resp
-          case None => throw CCPException("Failed to obtain character info from ESI API")
-        }
-      }
-      corp <- Future {
-        esiCorpClient
-          .getCorporationsCorporationId(
-            exCharInfo.corporationId.toInt,
-            datasource = defaultDatasource
-          ) match {
-          case Some(corpResp) => corpResp
-          case None => throw CCPException("Failed to obtain corporation info from ESI API")
-        }
-      }
-      alliance <- Future {
-        corp.allianceId.flatMap { id =>
-          esiAllianceClient
-            .getAlliancesAllianceId(
-              id.toInt,
-              datasource = defaultDatasource
-            )
-        }
-      }
-      res <- Future {
-        EveUserData(
-          char.CharacterID,
-          char.CharacterName,
-          exCharInfo.corporationId.toLong,
-          corp.corporationName,
-          corp.allianceId.map(_.toLong),
-          alliance.map(_.allianceName)
-        )
-      }
-    } yield res
+    this.executeAsync[VerifyResponse](q, parseResponse[VerifyResponse])
+      .flatMap(r => publicDataClient.fetchUserByCharacterId(r.CharacterID))
   }
 }

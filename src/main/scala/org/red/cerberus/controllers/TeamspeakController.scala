@@ -35,7 +35,8 @@ class TeamspeakController(config: Config, userController: UserController)(implic
   client.selectVirtualServerById(config.getInt("ts3.virtualServerId"))
   client.setNickname(config.getString("ts3.botName"))
   client.registerAllEvents()
-
+  
+  
   def createRegistrationAttempt(userId: Int): Unit = {
     val p = Promise[String]()
     userController.getUser(userId).flatMap { u =>

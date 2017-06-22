@@ -39,8 +39,10 @@ object User {
       characterName = usersViewRow.characterName.get,
       corporationId = usersViewRow.corporationId.get,
       corporationName = usersViewRow.corporationName.get,
+      corporationTicker = usersViewRow.corporationTicker.get,
       allianceId = usersViewRow.allianceId,
-      allianceName = usersViewRow.allianceName
+      allianceName = usersViewRow.allianceName,
+      allianceTicker = usersViewRow.allianceTicker
     )
     User(
       eveUserData = eveUserData,

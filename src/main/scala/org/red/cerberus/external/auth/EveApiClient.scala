@@ -8,8 +8,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 
 class EveApiClient(config: Config) extends LazyLogging {
-  private val legacyClient = new LegacyClient(config)
-  private val ssoClient = new SSOClient(config)
+  private val publicDataClient = new PublicDataClient
+  private val legacyClient = new LegacyClient(config, publicDataClient)
+  private val ssoClient = new SSOClient(config, publicDataClient)
 
   def fetchUser(credentials: Credentials): Future[EveUserData] = {
     credentials match {

@@ -10,7 +10,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 
-private[this] class LegacyClient(config: Config) extends LazyLogging {
+private[this] class LegacyClient(config: Config, publicDataClient: PublicDataClient) extends LazyLogging {
   private val minimumMask: Int = config.getInt("legacyAPI.minimumKeyMask")
 
   def fetchUser(legacyCredentials: LegacyCredentials): Future[EveUserData] = {
@@ -18,7 +18,7 @@ private[this] class LegacyClient(config: Config) extends LazyLogging {
     val f = client.account.APIKeyInfo().flatMap {
       case Success(res) if (res.result.key.accessMask & minimumMask) == minimumMask =>
         res.result.key.rowset.row.find(_.characterName == legacyCredentials.name) match {
-          case Some(ch) => Future(EveUserData(ch))
+          case Some(ch) => publicDataClient.fetchUserByCharacterId(ch.characterID.toLong)
           case None => throw ResourceNotFoundException(s"Character ${legacyCredentials.name} not found")
         }
       case Failure(ex) => throw BadEveCredential(legacyCredentials, "Invalid key", -2)

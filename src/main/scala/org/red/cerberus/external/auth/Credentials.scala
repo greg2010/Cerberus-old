@@ -11,26 +11,10 @@ case class EveUserData(characterId: Long,
                        characterName: String,
                        corporationId: Long,
                        corporationName: String,
+                       corporationTicker: String,
                        allianceId: Option[Long],
-                       allianceName: Option[String])
-
-object EveUserData {
-  def apply(eveApiRow: Row): EveUserData = {
-    try {
-      EveUserData(
-        characterId = eveApiRow.characterID.toLong,
-        characterName = eveApiRow.characterName,
-        corporationId = eveApiRow.corporationID.toLong,
-        corporationName = eveApiRow.corporationName,
-        allianceId = Option(eveApiRow.allianceID.toLong),
-        allianceName = Option(eveApiRow.allianceName)
-      )
-    } catch {
-      case ex: NullPointerException =>
-        throw CCPException(s"One of mandatory XML API fields returned null ${ex.getMessage}")
-    }
-  }
-}
+                       allianceName: Option[String],
+                       allianceTicker: Option[String])
 
 sealed trait Credentials
 case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials
