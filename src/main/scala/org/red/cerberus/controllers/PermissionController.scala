@@ -3,24 +3,20 @@ package org.red.cerberus.controllers
 
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import io.circe.yaml._
 import org.red.cerberus.exceptions.ResourceNotFoundException
-import org.red.cerberus.external.auth.EveUserData
+import org.red.cerberus.util.{EveUserData, PermissionBitEntry}
 import slick.jdbc.PostgresProfile.api._
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 
 import scala.annotation.tailrec
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
 import scala.util.{Failure, Success}
 
 
-case class PermissionBitEntry(name: String, bit_position: Int, description: String)
-
-class PermissionController(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
+class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
   private case class PermissionMap(permission_map: Seq[PermissionBitEntry])
 
   val permissionMap: Seq[PermissionBitEntry] = parser.parse(Source.fromResource("permission_map.yml").getLines().mkString("\n")) match {

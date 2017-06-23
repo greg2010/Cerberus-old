@@ -4,17 +4,17 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import moe.pizza.eveapi.EVEAPI
 import org.red.cerberus.exceptions.{BadEveCredential, ResourceNotFoundException}
+import org.red.cerberus.util.{EveUserData, LegacyCredentials}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 
-private[this] class LegacyClient(config: Config, publicDataClient: PublicDataClient) extends LazyLogging {
+private[this] class LegacyClient(config: Config, publicDataClient: PublicDataClient)(implicit ec: ExecutionContext) extends LazyLogging {
   private val minimumMask: Int = config.getInt("legacyAPI.minimumKeyMask")
 
   def fetchUser(legacyCredentials: LegacyCredentials): Future[EveUserData] = {
-    lazy val client = new EVEAPI()(Some(legacyCredentials.apiKey), global)
+    lazy val client = new EVEAPI()(Some(legacyCredentials.apiKey), ec)
     val f = client.account.APIKeyInfo().flatMap {
       case Success(res) if (res.result.key.accessMask & minimumMask) == minimumMask =>
         res.result.key.rowset.row.find(_.characterName == legacyCredentials.name) match {
@@ -30,7 +30,7 @@ private[this] class LegacyClient(config: Config, publicDataClient: PublicDataCli
           s"characterId=${res.characterId} " +
           s"event=external.auth.legacy.fetch.success")
       case Failure(ex) =>
-        logger.error(s"Failed to fetch user using legacy PI " +
+        logger.error(s"Failed to fetch user using legacy API " +
           s"event=external.auth.legacy.fetch.failure", ex)
     }
     f

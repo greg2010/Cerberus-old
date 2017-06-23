@@ -2,12 +2,12 @@ package org.red.cerberus.external.auth
 
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import org.red.cerberus.util._
 
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ExecutionContext, Future}
 
 
-class EveApiClient(config: Config) extends LazyLogging {
+class EveApiClient(config: Config)(implicit ec: ExecutionContext) extends LazyLogging {
   private val publicDataClient = new PublicDataClient
   private val legacyClient = new LegacyClient(config, publicDataClient)
   private val ssoClient = new SSOClient(config, publicDataClient)

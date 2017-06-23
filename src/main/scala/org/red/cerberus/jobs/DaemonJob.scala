@@ -2,10 +2,10 @@ package org.red.cerberus.jobs
 
 import com.typesafe.scalalogging.LazyLogging
 import org.quartz._
+import org.red.cerberus.daemons.ScheduleDaemon
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
-import org.red.cerberus.controllers.ScheduleController
 import org.red.cerberus.exceptions.ExceptionHandlers
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,7 +16,7 @@ class DaemonJob extends Job with LazyLogging {
   override def execute(context: JobExecutionContext): Unit = {
     try {
       val dbAgent = context.getScheduler.getContext.get("dbAgent").asInstanceOf[JdbcBackend.Database]
-      val scheduleController = context.getScheduler.getContext.get("scheduleController").asInstanceOf[ScheduleController]
+      val scheduleController = context.getScheduler.getContext.get("scheduleController").asInstanceOf[ScheduleDaemon]
       dbAgent.run(Coalition.EveApi.result).flatMap { r =>
         Future.sequence {
           r.map(scheduleController.scheduleUserUpdate)

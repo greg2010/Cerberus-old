@@ -9,6 +9,7 @@ import org.matthicks.mailgun.MessageResponse
 import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth._
+import org.red.cerberus.util._
 import org.red.db.models.Coalition
 import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow, UsersViewRow}
 import slick.dbio.Effect
@@ -16,52 +17,14 @@ import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
 import slick.sql.FixedSqlAction
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
-case class User(eveUserData: EveUserData,
-                userId: Int,
-                email: String,
-                password: Option[String],
-                salt: Option[String],
-                isBanned: Boolean,
-                creationTime: Timestamp,
-                lastLoggedIn: Timestamp,
-                languageCode: String)
-
-object User {
-  def apply(usersViewRow: UsersViewRow): User = {
-    // TODO: raise postgres exception on failed get
-    val eveUserData = EveUserData(
-      characterId = usersViewRow.characterId.get,
-      characterName = usersViewRow.characterName.get,
-      corporationId = usersViewRow.corporationId.get,
-      corporationName = usersViewRow.corporationName.get,
-      corporationTicker = usersViewRow.corporationTicker.get,
-      allianceId = usersViewRow.allianceId,
-      allianceName = usersViewRow.allianceName,
-      allianceTicker = usersViewRow.allianceTicker
-    )
-    User(
-      eveUserData = eveUserData,
-      userId = usersViewRow.userId.get,
-      email = usersViewRow.email.get,
-      password = usersViewRow.password,
-      salt = usersViewRow.salt,
-      isBanned = usersViewRow.banned.get,
-      creationTime = usersViewRow.creationTime.get,
-      lastLoggedIn = usersViewRow.lastLoggedIn.get,
-      languageCode = usersViewRow.languageCode.get
-    )
-  }
-}
-
-class UserController(permissionController: PermissionController, emailController: EmailController, eveApiClient: EveApiClient)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
 
 
 
+class UserController(permissionController: => PermissionController, emailController: => EmailController, eveApiClient: => EveApiClient)(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
 
   private val rsg: Stream[Char] = Random.alphanumeric
   def generateSalt: String = rsg.take(4).mkString
@@ -72,12 +35,11 @@ class UserController(permissionController: PermissionController, emailController
 
   private def verifyPassword(pwd: String, salt: String, dbHash: String): Boolean = generatePwdHash(pwd, salt) == dbHash
 
-  private def usersQuery(email: String,
+  private def insertToUsersQuery(email: String,
                          eveUserData: EveUserData,
                          password: Option[String],
                          timestamp: Timestamp
                         ): FixedSqlAction[Int, NoStream, Effect.Write] = {
-
     val passwordWithSalt = password match {
       case Some(pwd) =>
         val s = generateSalt
@@ -115,7 +77,6 @@ class UserController(permissionController: PermissionController, emailController
   }
 
   def legacyLogin(nameOrEmail: String, password: String): Future[UserData] = {
-
     val query = Coalition.UsersView
       .filter(u => u.email === nameOrEmail || u.characterName === nameOrEmail)
       .take(1)
@@ -179,12 +140,14 @@ class UserController(permissionController: PermissionController, emailController
           Coalition.CorporationRow(
             eveUserData.corporationId,
             eveUserData.corporationName,
+            eveUserData.corporationTicker,
             eveUserData.allianceId,
             currentTimestamp))
 
-    val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName) match {
-      case (Some(aId), Some(aName)) => Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, currentTimestamp))
-      case (None, None) => DBIO.successful {}
+    val allianceQuery = (eveUserData.allianceId, eveUserData.allianceName, eveUserData.allianceTicker) match {
+      case (Some(aId), Some(aName), Some(aTicker)) =>
+        Coalition.Alliance.insertOrUpdate(Coalition.AllianceRow(aId, aName, aTicker, currentTimestamp))
+      case (None, None, None) => DBIO.successful {}
       case _ => throw CCPException("Alliance ID or name is present, but not both")
     }
 
@@ -211,7 +174,7 @@ class UserController(permissionController: PermissionController, emailController
 
       val action = (for {
         _ <- updateUserDataQuery(eveUserData)
-        userId <- usersQuery(email, eveUserData, password, currentTimestamp)
+        userId <- insertToUsersQuery(email, eveUserData, password, currentTimestamp)
         _ <- credsQuery(userId)
       } yield userId).transactionally
       val f = dbAgent.run(action).recoverWith(ExceptionHandlers.dbExceptionHandler)

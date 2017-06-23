@@ -4,15 +4,15 @@ import com.osinka.i18n.{Lang, Messages}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.matthicks.mailgun.{EmailAddress, Mailgun, Message, MessageResponse}
+
 import scala.concurrent.duration._
 import com.gilt.gfc.concurrent.ScalaFutures._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 
-class EmailController(config: Config, userController: UserController) extends LazyLogging {
+class EmailController(config: Config, userController: => UserController)(implicit ec: ExecutionContext) extends LazyLogging {
   private val mailer = new Mailgun(config.getString("mailer.domain"), config.getString("mailer.apiKey"))
   private val defaultEmailSender = EmailAddress(
     config.getString("mailer.defaultSenderEmail"),

@@ -6,14 +6,14 @@ import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
 import io.circe.yaml.parser
 import org.red.cerberus.UserData
+import org.red.cerberus.util.PermissionBitEntry
 
 import scala.annotation.tailrec
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
 
 
-class AuthorizationController(permissionController: PermissionController) extends LazyLogging {
+class AuthorizationController(permissionController: => PermissionController)(implicit ec: ExecutionContext) extends LazyLogging {
 
   case class AccessMapEntry(route: String, kind: String, required_permissions: Seq[String])
   case class AccessMapEntryEnhanced(path: Uri, method: Option[String], requiredPermissions: Seq[PermissionBitEntry])

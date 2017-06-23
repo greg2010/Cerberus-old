@@ -7,16 +7,15 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.{Decoder, parser}
 import org.red.cerberus.exceptions.CCPException
-import org.red.eveapi.esi.api.{AllianceApi, CharacterApi, CorporationApi}
 import io.circe.generic.auto._
-import scala.concurrent.ExecutionContext.Implicits.global
+import org.red.cerberus.util.{EveUserData, SSOAuthCode, SSOCredentials}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 import scalaj.http.{Http, HttpRequest}
 
 
-private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient) extends LazyLogging {
+private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient)(implicit ec: ExecutionContext) extends LazyLogging {
   private val defaultDatasource = Some("tranquility")
   private val baseUrl = "https://login.eveonline.com/oauth"
   private val userAgent = "red-cerberus/1.0"
@@ -27,9 +26,6 @@ private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient
       .header("Content-Type", "application/x-www-form-urlencoded")
       .auth(config.getString("SSOClientId"), config.getString("SSOClientSecret"))
 
-  private lazy val esiCharClient = new CharacterApi()
-  private lazy val esiCorpClient = new CorporationApi()
-  private lazy val esiAllianceClient = new AllianceApi()
   private case class VerifyResponse(CharacterID: Long,
                                     CharacterName: String,
                                     ExpiresOn: String,

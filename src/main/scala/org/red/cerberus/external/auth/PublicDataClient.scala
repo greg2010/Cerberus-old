@@ -1,57 +1,67 @@
 package org.red.cerberus.external.auth
 
-import org.red.cerberus.exceptions.CCPException
-import org.red.eveapi.esi.api.{AllianceApi, CharacterApi, CorporationApi}
+import net.troja.eve.esi.api.{AllianceApi, CharacterApi, CorporationApi}
+import net.troja.eve.esi.model.{AllianceResponse, CharacterResponse, CorporationResponse}
+import org.red.cerberus.util.EveUserData
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-private[this] class PublicDataClient {
-  private val defaultDatasource = Some("tranquility")
+private[this] class PublicDataClient(implicit ec: ExecutionContext) {
+  private val defaultDatasource = "tranquility"
   private lazy val esiCharClient = new CharacterApi
   private lazy val esiCorpClient = new CorporationApi
   private lazy val esiAllianceClient = new AllianceApi
 
+  def fetchCharacterById(characterId: Long): Future[CharacterResponse] = Future {
+    esiCharClient
+      .getCharactersCharacterId(
+        characterId.toInt,
+        defaultDatasource,
+        null,
+        null
+      )
+  }
+
+
+  def fetchCorporationById(corporationId: Long): Future[CorporationResponse] = Future {
+    esiCorpClient
+      .getCorporationsCorporationId(
+        corporationId.toInt,
+        defaultDatasource,
+        null,
+        null
+      )
+  }
+
+
+  def fetchAllianceById(allianceId: Long): Future[AllianceResponse] = Future {
+    esiAllianceClient
+      .getAlliancesAllianceId(
+        allianceId.toInt,
+        defaultDatasource,
+        null,
+        null
+      )
+  }
+
   def fetchUserByCharacterId(characterId: Long): Future[EveUserData] = {
     for {
-      extraCharInfo <- Future {
-        esiCharClient
-          .getCharactersCharacterId(
-            characterId.toInt,
-            datasource = defaultDatasource
-          ) match {
-          case Some(resp) => resp
-          case None => throw CCPException("Failed to obtain character info from ESI API")
-        }
-      }
-      corp <- Future {
-        esiCorpClient
-          .getCorporationsCorporationId(
-            extraCharInfo.corporationId.toInt,
-            datasource = defaultDatasource
-          ) match {
-          case Some(corpResp) => corpResp
-          case None => throw CCPException("Failed to obtain corporation info from ESI API")
-        }
-      }
-      alliance <- Future {
-        corp.allianceId.flatMap { id =>
-          esiAllianceClient
-            .getAlliancesAllianceId(
-              id.toInt,
-              datasource = defaultDatasource
-            )
-        }
+      extraCharInfo <- this.fetchCharacterById(characterId)
+      corp <- this.fetchCorporationById(extraCharInfo.getCorporationId.toInt)
+      alliance <- Option(corp.getAllianceId) match {
+        case Some(id) => fetchAllianceById(id.toInt).map(Option.apply)
+        case None => Future(None)
       }
       res <- Future {
         EveUserData(
           characterId,
-          extraCharInfo.name,
-          extraCharInfo.corporationId.toLong,
-          corp.corporationName,
-          corp.ticker,
-          corp.allianceId.map(_.toLong),
-          alliance.map(_.allianceName),
-          alliance.map(_.ticker)
+          extraCharInfo.getName,
+          extraCharInfo.getCorporationId.toLong,
+          corp.getCorporationName,
+          corp.getTicker,
+          Option(corp.getAllianceId.toLong),
+          alliance.map(_.getAllianceName),
+          alliance.map(_.getTicker)
         )
       }
     } yield res

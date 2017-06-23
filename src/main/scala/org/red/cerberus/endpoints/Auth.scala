@@ -9,7 +9,8 @@ import akka.http.scaladsl.server.Directives._
 import io.circe.generic.auto._
 import moe.pizza.eveapi.ApiKey
 import org.red.cerberus.controllers.UserController
-import org.red.cerberus.external.auth.{EveApiClient, LegacyCredentials, SSOAuthCode, SSOCredentials}
+import org.red.cerberus.external.auth.EveApiClient
+import org.red.cerberus.util.{LegacyCredentials, SSOAuthCode}
 
 import scala.concurrent.Future
 

@@ -10,6 +10,7 @@ import org.red.cerberus.external.auth.EveApiClient
 
 trait Base
   extends ApacheLog
+  with Middleware
   with AuthenticationHandler
   with RouteHelpers
   with Auth

@@ -1,33 +1,43 @@
-package org.red.cerberus.controllers
+package org.red.cerberus.daemons
 
 import java.util.Date
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import monix.execution.Scheduler.{global => scheduler}
 import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
+import org.quartz.impl.StdSchedulerFactory
 import org.quartz.{CronScheduleBuilder, Scheduler, SimpleScheduleBuilder, TriggerKey}
+import org.red.cerberus.controllers.UserController
 import org.red.cerberus.exceptions.ResourceNotFoundException
-import org.red.cerberus.jobs.{DaemonJob, UpdateLegacyUserJob, UpdateSSOUserJob}
+import org.red.cerberus.external.auth.EveApiClient
+import org.red.cerberus.jobs.{DaemonJob, UserJob}
+import org.red.cerberus.util.CredentialsType
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
-import monix.execution.Scheduler.{global => scheduler}
 
 import scala.concurrent.duration._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 
-class ScheduleController(quartzScheduler: Scheduler, config: Config, userController: UserController)(implicit dbAgent: JdbcBackend.Database) extends LazyLogging {
-
-  quartzScheduler.getContext.put("dbAgent", dbAgent)
-  quartzScheduler.getContext.put("scheduleController", this)
-  quartzScheduler.getContext.put("userController", userController)
+class ScheduleDaemon(config: Config, userController: => UserController, eveApiClient: => EveApiClient)
+                    (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends AbstractDaemon with LazyLogging {
+  private val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
   val daemonTriggerName = "userDaemon"
-  scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
-    this.startUserDaemon()
+
+  def initialize(): Unit = {
+    quartzScheduler.getContext.put("ec", ec)
+    quartzScheduler.getContext.put("dbAgent", dbAgent)
+    quartzScheduler.getContext.put("scheduleController", this)
+    quartzScheduler.getContext.put("userController", userController)
+    quartzScheduler.getContext.put("eveApiClient", eveApiClient)
+    quartzScheduler.start()
+    scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
+      this.startUserDaemon()
+    }
   }
 
   def startUserDaemon(): Future[Date] = Future {
@@ -63,16 +73,17 @@ class ScheduleController(quartzScheduler: Scheduler, config: Config, userControl
           logger.info(s"Job doesn't exist, scheduling id=${user.id} userId=${user.userId} event=user.schedule")
           val j = newJob()
             .withIdentity(user.id.toString, config.getString("quartzUserUpdateGroupName"))
-          val builtJob = (user.keyId, user.verificationCode, user.evessoRefreshToken) match {
+          val builtJob = j.ofType((new UserJob).getClass).build()
+          (user.keyId, user.verificationCode, user.evessoRefreshToken) match {
             case (Some(keyId), Some(vCode), _) =>
-              val b = j.ofType((new UpdateLegacyUserJob).getClass).build()
-              b.getJobDataMap.put("keyId", keyId)
-              b.getJobDataMap.put("vCode", vCode)
-              b
+              builtJob.getJobDataMap.put("credentialsType", CredentialsType.Legacy.toString)
+              builtJob.getJobDataMap.put("keyId", keyId)
+              builtJob.getJobDataMap.put("vCode", vCode)
+              builtJob
             case (_, _, Some(ssoToken)) =>
-              val b = j.ofType((new UpdateSSOUserJob).getClass).build()
-              b.getJobDataMap.put("ssoToken", ssoToken)
-              b
+              builtJob.getJobDataMap.put("credentialsType", CredentialsType.SSO.toString)
+              builtJob.getJobDataMap.put("ssoToken", ssoToken)
+              builtJob
             case _ =>
               throw ResourceNotFoundException("Not found eve API credentials for user")
           }
