@@ -4,9 +4,8 @@ import akka.http.scaladsl.server.RequestContext
 import com.netaporter.uri.{PathPart, Uri}
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
-import io.circe.yaml.parser
 import org.red.cerberus.UserData
-import org.red.cerberus.util.PermissionBitEntry
+import org.red.cerberus.util.{PermissionBitEntry, YamlParser}
 
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
@@ -48,29 +47,19 @@ class AuthorizationController(permissionController: => PermissionController)(imp
   }
 
   val permissionMap: Seq[AccessMapEntryEnhanced] =
-    parser.parse(Source.fromResource("access_map.yml").getLines().mkString("\n")) match {
-      case Right(res) =>
-        res.as[AccessMap] match {
-          case Right(map) => map.access_map.map { entry =>
-            AccessMapEntryEnhanced(
-              path = Uri.parse(entry.route),
-              method = entry.kind match {
-                case "*" => None
-                case methodName => Some(methodName)
-              },
-              requiredPermissions =
-                entry
-                  .required_permissions
-                  .map(permissionController.findPermissionByName)
-            )
-          }
-          case Left(ex) =>
-            logger.error(s"Failed to decode ${res.toString()}", ex)
-            throw ex
-        }
-      case Left(ex) =>
-        logger.error("Failed to parse permissions yaml file", ex)
-        throw ex
+    YamlParser.parseResource[AccessMap](Source.fromResource("access_map.yml"))
+      .access_map.map { entry =>
+      AccessMapEntryEnhanced(
+        path = Uri.parse(entry.route),
+        method = entry.kind match {
+          case "*" => None
+          case methodName => Some(methodName)
+        },
+        requiredPermissions =
+          entry
+            .required_permissions
+            .map(permissionController.findPermissionByName)
+      )
     }
 
 

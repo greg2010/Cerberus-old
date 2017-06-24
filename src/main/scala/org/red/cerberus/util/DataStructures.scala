@@ -66,3 +66,5 @@ object CredentialsType extends Enumeration {
 }
 
 case class PermissionBitEntry(name: String, bit_position: Int, description: String)
+
+case class TeamspeakGroupMapEntry(bit_name: String, teamspeak_group_id: Int)

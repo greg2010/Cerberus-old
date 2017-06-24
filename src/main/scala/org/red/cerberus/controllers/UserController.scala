@@ -93,7 +93,7 @@ class UserController(permissionController: => PermissionController, emailControl
         case (Some(dbHash), Some(salt)) =>
           if (verifyPassword(password, salt, dbHash) && !res.isBanned) {
             checkInUser(res.userId)
-            permissionController.calculateAclPermission(res.eveUserData).flatMap { perm =>
+            permissionController.calculateBinPermission(res.eveUserData).flatMap { perm =>
               Future {
                 UserData(
                   name = res.eveUserData.characterName,
@@ -198,6 +198,23 @@ class UserController(permissionController: => PermissionController, emailControl
         case None => throw ResourceNotFoundException(s"No user found with id $userId")
       }
     }
+  }
+
+  def getTeamspeakUniqueId(userId: Int): Future[String] = {
+    val f = dbAgent.run(Coalition.TeamspeakUsers.filter(_.userId === userId).result)
+      .map { res =>
+        res.headOption match {
+          case Some(r) => r.uniqueId
+          case None => throw ResourceNotFoundException(s"No teamspeak uniqueId found for $userId")
+        }
+      }
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Got teamspeak uniqueId for userId=$userId event=user.getTeamspeakUniqueId.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to get teamspeak uniqueId for userId=$userId event=user.getTeamspeakUniqueId.failure")
+    }
+    f
   }
 
 

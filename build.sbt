@@ -41,7 +41,6 @@ libraryDependencies ++= Seq(
   "net.joelinn" % "quartz-redis-jobstore" % "1.1.8",
   "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT",
   "org.red" %% "reddb" % "1.0.6-SNAPSHOT",
-  //"org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "net.troja.eve" % "eve-esi" % "1.0.0",
   "io.monix" %% "monix" % "2.3.0",
   "org.matthicks" %% "mailgun4s" % "1.0.4",

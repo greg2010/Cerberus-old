@@ -3,9 +3,8 @@ package org.red.cerberus.controllers
 
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
-import io.circe.yaml._
 import org.red.cerberus.exceptions.ResourceNotFoundException
-import org.red.cerberus.util.{EveUserData, PermissionBitEntry}
+import org.red.cerberus.util.{EveUserData, PermissionBitEntry, YamlParser}
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
@@ -16,22 +15,11 @@ import scala.io.Source
 import scala.util.{Failure, Success}
 
 
-class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
+class PermissionController(userController: => UserController)(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
 
   private case class PermissionMap(permission_map: Seq[PermissionBitEntry])
-
-  val permissionMap: Seq[PermissionBitEntry] = parser.parse(Source.fromResource("permission_map.yml").getLines().mkString("\n")) match {
-    case Right(res) =>
-      res.as[PermissionMap] match {
-        case Right(map) => map.permission_map
-        case Left(ex) =>
-          logger.error(s"Failed to decode ${res.toString()}", ex)
-          throw ex
-      }
-    case Left(ex) =>
-      logger.error("Failed to parse permissions yaml file", ex)
-      throw ex
-  }
+  val permissionMap: Seq[PermissionBitEntry] =
+    YamlParser.parseResource[PermissionMap](Source.fromResource("permission_map.yml")).permission_map
 
   def findPermissionByName(name: String): PermissionBitEntry = {
     permissionMap.find(_.name == name) match {
@@ -44,7 +32,14 @@ class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: Execution
     }
   }
 
-  def calculateAclPermission(characterId: Option[Long],
+  def calculateAclPermissionsByUserId(userId: Int): Future[Seq[PermissionBitEntry]] = {
+    for {
+      user <- userController.getUser(userId)
+      permissions <- calculateBinPermission(user.eveUserData).map(getAclPermissions)
+    } yield permissions
+  }
+
+  def calculateBinPermission(characterId: Option[Long],
                              corporationId: Option[Long],
                              allianceId: Option[Long]): Future[Long] = {
     val q = Coalition.Acl.filter(
@@ -74,8 +69,8 @@ class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: Execution
     f
   }
 
-  def calculateAclPermission(eveUserData: EveUserData): Future[Long] = {
-    calculateAclPermission(
+  def calculateBinPermission(eveUserData: EveUserData): Future[Long] = {
+    calculateBinPermission(
       Some(eveUserData.characterId),
       Some(eveUserData.corporationId),
       eveUserData.allianceId
