@@ -1,31 +1,29 @@
 package org.red.cerberus.daemons
 
 import com.github.theholywaffle.teamspeak3.api.event._
+import scala.concurrent.duration._
 import com.github.theholywaffle.teamspeak3.api.reconnect.{ConnectionHandler, ReconnectStrategy}
-import com.github.theholywaffle.teamspeak3.{TS3ApiAsync, TS3Config, TS3Query}
+import com.github.theholywaffle.teamspeak3.{TS3Config, TS3Query}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
-import monix.execution.atomic.AtomicBoolean
 import org.red.cerberus.controllers.UserController
 import org.red.cerberus.exceptions.ConflictingEntityException
 import org.red.cerberus.util.FutureConverters
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
+import com.gilt.gfc.concurrent.ScalaFutures.FutureOps
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
-
 class TeamspeakDaemon(config: Config, userController: => UserController)
                      (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext)
-  extends AbstractDaemon with LazyLogging {
-
-  //private val isConnected = new AtomicBoolean(false)
+  extends LazyLogging {
 
   private class CustomConnectionHandler extends ConnectionHandler {
+
     override def onDisconnect(ts3Query: TS3Query): Unit = {
-      //isConnected.set(false)
       logger.warn("Disconnected from teamspeak event=teamspeak.disconnect")
     }
 
@@ -36,7 +34,7 @@ class TeamspeakDaemon(config: Config, userController: => UserController)
       client.selectVirtualServerById(config.getInt("ts3.virtualServerId"))
       client.setNickname(config.getString("ts3.botName"))
       client.registerAllEvents()
-      //isConnected.set(true)
+
       FutureConverters.commandToScalaFuture(client.getServerInfo)
         .onComplete {
           case Success(r) =>
@@ -80,38 +78,50 @@ class TeamspeakDaemon(config: Config, userController: => UserController)
 
   private val ts3Query = new TS3Query(ts3Conf)
   private val client = ts3Query.getAsyncApi
+  private val initialConnectionFuture: Future[Unit] = Future {
+    ts3Query.connect()
+  }.withTimeout(30.seconds)
 
 
-  override def initialize(): Unit = {
-    try {
-      ts3Query.connect()
-    } catch {
-      case ex: Exception =>
-    }
+  initialConnectionFuture.onComplete {
+    case Success(r) =>
+      logger.info(s"Connected to teamspeak teamspeakHost=${config.getString("ts3.host")} " +
+        s"event=teamspeak.connect.success")
+    case Failure(ex) =>
+      logger.error("Failed to connect to teamspeak event=teamspeak.connect.failure", ex)
   }
 
-  def addListener(listener: TS3EventAdapter) = {
-    Future {
 
-    }
-  }
-
-  def createRegistrationAttempt(userId: Int): Unit = {
-    Thread.sleep(5000)
-    val p = Promise[String]()
-    userController.getUser(userId).flatMap { u =>
+  def createRegistrationAttempt(userId: Int): Future[Unit] = {
+    val r = userController.getUser(userId).flatMap { u =>
+      val p = Promise[String]()
       val expectedNickname = s"${u.eveUserData.characterName} | ${u.eveUserData.corporationTicker}" +
         (u.eveUserData.allianceTicker match {
         case Some(n) => s" | $n"
         case None => ""
       })
-      client.addTS3Listeners(new RegistrationJoinListener(expectedNickname, p))
-      logger.info(s"Successfully registered listener for " +
-        s"userId=$userId " +
-        s"expectedNickname=$expectedNickname " +
-        s"event=teamspeak.listener.create.success")
+      val f =
+        initialConnectionFuture.map { _ =>
+        client.addTS3Listeners(new RegistrationJoinListener(expectedNickname, p))
+        logger.info(s"Successfully registered listener for " +
+          s"userId=$userId " +
+          s"expectedNickname=$expectedNickname " +
+          s"event=teamspeak.listener.create.success")
+      }
       p.future.flatMap(uniqueId => registerTeamspeakUser(userId, uniqueId))
+      f
     }
+    r.onComplete {
+      case Success(_) =>
+        logger.info(s"Created registration request for " +
+          s"userId=$userId " +
+          s"event=teamspeak.listener.create.success")
+      case Failure(ex) =>
+        logger.error("Failed to create registration request for " +
+          s"userId=$userId " +
+          s"event=teamspeak.listener.create.failure", ex)
+    }
+    r
   }
 
   def registerTeamspeakUser(userId: Int, uniqueId: String): Future[Int] = {

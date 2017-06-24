@@ -4,6 +4,7 @@ import java.util.Date
 
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import monix.execution.Cancelable
 import monix.execution.Scheduler.{global => scheduler}
 import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
@@ -24,11 +25,11 @@ import scala.util.Random
 
 
 class ScheduleDaemon(config: Config, userController: => UserController, eveApiClient: => EveApiClient)
-                    (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends AbstractDaemon with LazyLogging {
+                    (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
   private val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
   val daemonTriggerName = "userDaemon"
 
-  def initialize(): Unit = {
+  Future {
     quartzScheduler.getContext.put("ec", ec)
     quartzScheduler.getContext.put("dbAgent", dbAgent)
     quartzScheduler.getContext.put("scheduleController", this)

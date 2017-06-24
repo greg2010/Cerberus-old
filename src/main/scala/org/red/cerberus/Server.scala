@@ -33,8 +33,6 @@ object Server extends App with LazyLogging with Base {
   lazy val teamspeakController = new TeamspeakDaemon(cerberusConfig, userController)
   lazy val scheduleController = new ScheduleDaemon(cerberusConfig, userController, eveApiClient)
 
-  teamspeakController.initialize()
-  scheduleController.initialize()
   teamspeakController.createRegistrationAttempt(1)
 
   val route: Route = this.baseRoute(authorizationController, userController, eveApiClient)
