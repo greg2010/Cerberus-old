@@ -21,7 +21,7 @@
     <logger name="io.netty" level="WARN"/>
 
     <root level="debug">
-        <appender-ref ref="GRAYLOG" />
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="GRAYLOG"/>
+        <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

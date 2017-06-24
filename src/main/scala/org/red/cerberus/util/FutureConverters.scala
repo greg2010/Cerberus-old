@@ -7,6 +7,7 @@ import scala.concurrent.{Future, Promise}
 import scala.language.implicitConversions
 
 object FutureConverters {
+
   private class CommandFutureListener[T](p: Promise[T])
     extends CommandFuture.SuccessListener[T] with CommandFuture.FailureListener {
     override def handleSuccess(result: T): Unit = {

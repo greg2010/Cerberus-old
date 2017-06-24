@@ -16,19 +16,26 @@ trait ApacheLog extends BasicDirectives with MiscDirectives {
     mapInnerRoute { originalRoute =>
       ctx => {
         def fromForwarded = ctx.request.header[`X-Forwarded-For`].flatMap(h => h.addresses.headOption)
+
         def userAgent = ctx.request.header[`User-Agent`]
+
         def fromRemoteAddress = ctx.request.header[`Remote-Address`].map(_.address)
+
         def fromRealIp = ctx.request.header[`X-Real-Ip`].map(_.address)
 
         def remoteAddress = fromForwarded orElse fromRemoteAddress orElse fromRealIp
+
         def remoteIp = remoteAddress.flatMap(ra => ra.toOption.map(_.getHostAddress)).getOrElse("-")
 
         def method = ctx.request.method.value
+
         def path = ctx.request.uri.path.toString
+
         def now = {
           val n = DateTime.now
           f"${n.day}%02d/${n.monthStr}/${n.year}:${n.hour}%02d:${n.minute}%02d:${n.second}%02d -0000"
         }
+
         def proto = ctx.request.protocol.value
 
         def mkString(code: String, size: String, time: String): String = s"""$remoteIp - [$now] "$method $path $proto" ${userAgent.getOrElse("-")} $code $size ${time}ms"""
@@ -36,7 +43,7 @@ trait ApacheLog extends BasicDirectives with MiscDirectives {
 
         val t0 = System.nanoTime()
         originalRoute(ctx).flatMap {
-          case rslt @ Complete(rsp) =>
+          case rslt@Complete(rsp) =>
             val time = (System.nanoTime() - t0) / 1000000
             val code = rsp.status.intValue.toString
 
@@ -44,7 +51,7 @@ trait ApacheLog extends BasicDirectives with MiscDirectives {
               log.info(mkString(code, size.toString, time.toString))
               rslt
             }
-          case rslt @ Rejected(rejections) =>
+          case rslt@Rejected(rejections) =>
             val reason = rejections.map(_.getClass.getName).mkString(",")
             log.info(mkString(reason, "-", "-"))
             Future.successful(rslt)

@@ -16,12 +16,15 @@ import scala.io.Source
 class AuthorizationController(permissionController: => PermissionController)(implicit ec: ExecutionContext) extends LazyLogging {
 
   case class AccessMapEntry(route: String, kind: String, required_permissions: Seq[String])
+
   case class AccessMapEntryEnhanced(path: Uri, method: Option[String], requiredPermissions: Seq[PermissionBitEntry])
+
   case class AccessMap(access_map: Seq[AccessMapEntry])
 
 
   def getPermissionsForUri(uri: Uri, method: String): Seq[PermissionBitEntry] = {
-    val filteredPermissionMap = permissionMap.filter { entry => entry.method.isEmpty || entry.method.get == method}
+    val filteredPermissionMap = permissionMap.filter { entry => entry.method.isEmpty || entry.method.get == method }
+
     @tailrec
     def getPermissionsForUriRec(parsed: Seq[PathPart],
                                 toParse: Seq[PathPart],
@@ -39,6 +42,7 @@ class AuthorizationController(permissionController: => PermissionController)(imp
         )
       }
     }
+
     logger.info(s"Calculating permission list for path=${uri.path}")
     getPermissionsForUriRec(Seq(), uri.pathParts, Seq())
   }
@@ -64,10 +68,10 @@ class AuthorizationController(permissionController: => PermissionController)(imp
             logger.error(s"Failed to decode ${res.toString()}", ex)
             throw ex
         }
-    case Left(ex) =>
-      logger.error("Failed to parse permissions yaml file", ex)
-      throw ex
-  }
+      case Left(ex) =>
+        logger.error("Failed to parse permissions yaml file", ex)
+        throw ex
+    }
 
 
   def customAuthorization(userData: UserData)(ctx: RequestContext): Future[Boolean] = {

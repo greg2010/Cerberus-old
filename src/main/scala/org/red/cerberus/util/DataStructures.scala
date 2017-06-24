@@ -6,7 +6,9 @@ import moe.pizza.eveapi.ApiKey
 import org.red.db.models.Coalition.UsersViewRow
 
 sealed trait Credentials
+
 case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials
+
 case class SSOCredentials(refreshToken: String, accessToken: String) extends Credentials
 
 case class SSOAuthCode(code: String)
@@ -20,6 +22,7 @@ case class User(eveUserData: EveUserData,
                 creationTime: Timestamp,
                 lastLoggedIn: Option[Timestamp],
                 languageCode: String)
+
 object User {
   def apply(usersViewRow: UsersViewRow): User = {
     // TODO: raise postgres exception on failed get

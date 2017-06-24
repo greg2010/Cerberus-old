@@ -5,13 +5,13 @@ import java.io.InputStream
 import com.gilt.gfc.concurrent.ScalaFutures.retryWithExponentialDelay
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import io.circe.generic.auto._
 import io.circe.{Decoder, parser}
 import org.red.cerberus.exceptions.CCPException
-import io.circe.generic.auto._
 import org.red.cerberus.util.{EveUserData, SSOAuthCode, SSOCredentials}
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scalaj.http.{Http, HttpRequest}
 
 
@@ -19,6 +19,7 @@ private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient
   private val defaultDatasource = Some("tranquility")
   private val baseUrl = "https://login.eveonline.com/oauth"
   private val userAgent = "red-cerberus/1.0"
+
   private def tokenRequest: HttpRequest =
     Http(baseUrl + "/token")
       .method("POST")
@@ -35,13 +36,13 @@ private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient
 
 
   private case class TokenResponse(access_token: String,
-                                     token_type: String,
-                                     expires_in: String,
-                                     refresh_token: String)
+                                   token_type: String,
+                                   expires_in: String,
+                                   refresh_token: String)
 
   private def parseResponse[T](respCode: Int,
-                                 headers: Map[String, IndexedSeq[String]],
-                                 is: InputStream)(implicit evidence: Decoder[T]): T = {
+                               headers: Map[String, IndexedSeq[String]],
+                               is: InputStream)(implicit evidence: Decoder[T]): T = {
     respCode match {
       case 200 =>
         parser.decode[T](scala.io.Source.fromInputStream(is).mkString) match {
@@ -55,7 +56,7 @@ private[this] class SSOClient(config: Config, publicDataClient: PublicDataClient
 
 
   private def executeAsync[T](httpRequest: HttpRequest,
-                                   parser: (Int, Map[String, IndexedSeq[String]], InputStream) => T) = {
+                              parser: (Int, Map[String, IndexedSeq[String]], InputStream) => T) = {
     retryWithExponentialDelay(
       maxRetryTimes = 3,
       initialDelay = 100.millis,

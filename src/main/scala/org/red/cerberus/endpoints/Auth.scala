@@ -1,17 +1,16 @@
 package org.red.cerberus.endpoints
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.Route
-import org.red.cerberus._
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Route
 import io.circe.generic.auto._
 import moe.pizza.eveapi.ApiKey
+import org.red.cerberus._
 import org.red.cerberus.controllers.UserController
 import org.red.cerberus.external.auth.EveApiClient
 import org.red.cerberus.util.{LegacyCredentials, SSOAuthCode}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 trait Auth extends RouteHelpers with AuthenticationHandler {
@@ -33,15 +32,15 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
           }
         } ~
           (post & entity(as[LegacySignupReq])) { req =>
-              complete {
-                userController.createUser(req.email, Some(req.password),
-                  LegacyCredentials(
-                    ApiKey(req.key_id.toInt, req.verification_code),
-                    req.name)
-                ).map { _ =>
-                  HttpResponse(StatusCodes.Created)
-                }
+            complete {
+              userController.createUser(req.email, Some(req.password),
+                LegacyCredentials(
+                  ApiKey(req.key_id.toInt, req.verification_code),
+                  req.name)
+              ).map { _ =>
+                HttpResponse(StatusCodes.Created)
               }
+            }
           }
       } ~
         pathPrefix("sso") {
@@ -49,15 +48,15 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
             complete {
               eveApiClient.fetchCredentials(SSOAuthCode(code))
                 .flatMap { res =>
-                userController.createUser("", None, res)
+                  userController.createUser("", None, res)
+                }
+            }
+          } ~
+            (get & parameter("token")) { token =>
+              complete {
+                HttpResponse(StatusCodes.OK)
               }
-            }
-          } ~
-          (get & parameter("token")) { token =>
-            complete {
-              HttpResponse(StatusCodes.OK)
-            }
-          } ~
+            } ~
             (post & parameters("refresh_token", "email", "password".?)) {
               (refreshToken, email, password) =>
                 complete {

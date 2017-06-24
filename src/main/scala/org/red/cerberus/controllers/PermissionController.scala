@@ -6,9 +6,9 @@ import io.circe.generic.auto._
 import io.circe.yaml._
 import org.red.cerberus.exceptions.ResourceNotFoundException
 import org.red.cerberus.util.{EveUserData, PermissionBitEntry}
-import slick.jdbc.PostgresProfile.api._
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
+import slick.jdbc.PostgresProfile.api._
 
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,6 +17,7 @@ import scala.util.{Failure, Success}
 
 
 class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
+
   private case class PermissionMap(permission_map: Seq[PermissionBitEntry])
 
   val permissionMap: Seq[PermissionBitEntry] = parser.parse(Source.fromResource("permission_map.yml").getLines().mkString("\n")) match {
@@ -46,11 +47,11 @@ class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: Execution
   def calculateAclPermission(characterId: Option[Long],
                              corporationId: Option[Long],
                              allianceId: Option[Long]): Future[Long] = {
-    val q = Coalition.Acl.filter (
+    val q = Coalition.Acl.filter(
       r =>
         (r.characterId === characterId || r.characterId.isEmpty) &&
-          (r.corporationId === corporationId  || r.corporationId.isEmpty) &&
-          (r.allianceId === allianceId  || r.allianceId.isEmpty) &&
+          (r.corporationId === corporationId || r.corporationId.isEmpty) &&
+          (r.allianceId === allianceId || r.allianceId.isEmpty) &&
           (r.characterId.isDefined || r.corporationId.isDefined || r.allianceId.isDefined)
     ).map(_.entityPermission)
 
@@ -88,6 +89,7 @@ class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: Execution
       if (toParse.isEmpty) soFar
       else getBinPermissionsRec(soFar + (1 << toParse.head.bit_position), toParse.tail)
     }
+
     val res = getBinPermissionsRec(0, acl)
     logger.info(s"Got binary permissions from " +
       s"acl=${acl.map(_.name).mkString(",")} " +
@@ -104,6 +106,7 @@ class PermissionController(implicit dbAgent: JdbcBackend.Database, ec: Execution
       else if ((aclMask & mask) == 1) getBitsRec(aclMask >> 1, curPosn + 1, soFar :+ curPosn)
       else getBitsRec(aclMask >> 1, curPosn + 1, soFar)
     }
+
     val res = getBitsRec(aclMask, 0, Seq()).map { bit =>
       permissionMap.find(_.bit_position == bit) match {
         case Some(entry) => entry

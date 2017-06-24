@@ -3,17 +3,16 @@ package org.red.cerberus
 import akka.http.scaladsl.model.headers.{HttpChallenge, HttpChallenges, HttpCredentials}
 import akka.http.scaladsl.server.Directives.AuthenticationResult
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.parser
 import io.circe.generic.auto._
+import io.circe.parser
 import io.circe.syntax._
 import org.red.cerberus.exceptions.AuthenticationException
 import pdi.jwt._
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
-
 
 
 case class UserData(name: String, id: Int, characterId: Long, permissions: Long) {
@@ -115,7 +114,7 @@ trait AuthenticationHandler extends LazyLogging {
     jwtClaim.subject match {
       case Some(sub) =>
         parser.decode[PrivateClaim](sub) match {
-          case Right(privateClaim) =>privateClaim.toUserData
+          case Right(privateClaim) => privateClaim.toUserData
           case Left(ex) =>
             logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
             throw ex

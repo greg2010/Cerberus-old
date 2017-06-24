@@ -21,4 +21,5 @@ package object cerberus {
     implicit val timeout: Timeout = Timeout(2 seconds)
     implicit val dbAgent: JdbcBackend.Database = Database.forConfig("postgres", conf)
   }
+
 }

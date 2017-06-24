@@ -1,14 +1,12 @@
-package org.red.cerberus.jobs
+package org.red.cerberus.jobs.quartz
 
 import com.typesafe.scalalogging.LazyLogging
 import moe.pizza.eveapi.ApiKey
 import org.quartz.{Job, JobExecutionContext}
 import org.red.cerberus.controllers.UserController
-import org.red.cerberus.daemons.ScheduleDaemon
 import org.red.cerberus.exceptions.ExceptionHandlers
 import org.red.cerberus.external.auth.EveApiClient
-import org.red.cerberus.util.{Credentials, CredentialsType, LegacyCredentials, SSOCredentials}
-import slick.jdbc.JdbcBackend
+import org.red.cerberus.util.{CredentialsType, LegacyCredentials}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -38,8 +36,6 @@ class UserJob extends Job with LazyLogging {
   override def execute(context: JobExecutionContext): Unit = {
     try {
       implicit val ec = context.getScheduler.getContext.get("ec").asInstanceOf[ExecutionContext]
-      val dbAgent = context.getScheduler.getContext.get("dbAgent").asInstanceOf[JdbcBackend.Database]
-      val scheduleController = context.getScheduler.getContext.get("scheduleController").asInstanceOf[ScheduleDaemon]
       val userController = context.getScheduler.getContext.get("userController").asInstanceOf[UserController]
       val eveApiClient = context.getScheduler.getContext.get("eveApiClient").asInstanceOf[EveApiClient]
       val userId = context.getMergedJobDataMap.getLong("userId")
@@ -58,6 +54,8 @@ class UserJob extends Job with LazyLogging {
       }).flatMap(eveApiClient.fetchUser)
         .flatMap(userController.updateUserData)
         .onComplete(updateUserCallback(userId, characterId, characterName, credentialsType))
-    } catch { ExceptionHandlers.jobExceptionHandler }
+    } catch {
+      ExceptionHandlers.jobExceptionHandler
+    }
   }
 }

@@ -11,22 +11,21 @@ import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth._
 import org.red.cerberus.util._
 import org.red.db.models.Coalition
-import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow, UsersViewRow}
+import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow}
 import slick.dbio.Effect
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
 import slick.sql.FixedSqlAction
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
-
-
 
 
 class UserController(permissionController: => PermissionController, emailController: => EmailController, eveApiClient: => EveApiClient)(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
 
   private val rsg: Stream[Char] = Random.alphanumeric
+
   def generateSalt: String = rsg.take(4).mkString
 
   private def generatePwdHash(password: String, salt: String): String = {
@@ -36,10 +35,10 @@ class UserController(permissionController: => PermissionController, emailControl
   private def verifyPassword(pwd: String, salt: String, dbHash: String): Boolean = generatePwdHash(pwd, salt) == dbHash
 
   private def insertToUsersQuery(email: String,
-                         eveUserData: EveUserData,
-                         password: Option[String],
-                         timestamp: Timestamp
-                        ): FixedSqlAction[Int, NoStream, Effect.Write] = {
+                                 eveUserData: EveUserData,
+                                 password: Option[String],
+                                 timestamp: Timestamp
+                                ): FixedSqlAction[Int, NoStream, Effect.Write] = {
     val passwordWithSalt = password match {
       case Some(pwd) =>
         val s = generateSalt
@@ -163,7 +162,7 @@ class UserController(permissionController: => PermissionController, emailControl
                  credentials: Credentials): Future[Unit] = {
     eveApiClient.fetchUser(credentials).flatMap { eveUserData =>
       val currentTimestamp = new Timestamp(System.currentTimeMillis())
-      
+
       def credsQuery(userId: Int) = credentials match {
         case legacy: LegacyCredentials =>
           Coalition.EveApi.map(c => (c.userId, c.characterId, c.keyId, c.verificationCode)) +=
@@ -226,7 +225,9 @@ class UserController(permissionController: => PermissionController, emailControl
     def insertAndSendToken(usersRow: UsersRow, obsoleteRequestId: Option[Int]): Future[(UsersRow, MessageResponse)] = {
       val deleteObsolete = obsoleteRequestId match {
         case Some(id) => dbAgent.run(deleteObsoleteQuery(id))
-        case None => Future {0}
+        case None => Future {
+          0
+        }
       }
       val token = generatePwdHash(UUID.randomUUID().toString, usersRow.id.toString)
       val q = Coalition.PasswordResetRequests.map(r => (r.email, r.token, r.timeCreated)) +=
@@ -305,7 +306,7 @@ class UserController(permissionController: => PermissionController, emailControl
     def testToken(passwordResetRequestsRow: PasswordResetRequestsRow, userId: Int): Boolean = {
       val dbHashedToken = generatePwdHash(passwordResetRequestsRow.token, userId.toString)
       val difference = (System.currentTimeMillis() - passwordResetRequestsRow.timeCreated.getTime).millis
-      (dbHashedToken == token) &&  difference < 15.minutes
+      (dbHashedToken == token) && difference < 15.minutes
     }
 
     val q = Coalition.Users.filter(_.email === email)

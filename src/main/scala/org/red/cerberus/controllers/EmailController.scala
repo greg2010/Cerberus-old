@@ -1,13 +1,12 @@
 package org.red.cerberus.controllers
 
+import com.gilt.gfc.concurrent.ScalaFutures._
 import com.osinka.i18n.{Lang, Messages}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.matthicks.mailgun.{EmailAddress, Mailgun, Message, MessageResponse}
 
 import scala.concurrent.duration._
-import com.gilt.gfc.concurrent.ScalaFutures._
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -30,7 +29,9 @@ class EmailController(config: Config, userController: => UserController)(implici
       mailer.send(Message.simple(from, to, subject, text = body))
     }
 
-    f.onComplete {emailSendCallback(from, to, subject, msgType)}
+    f.onComplete {
+      emailSendCallback(from, to, subject, msgType)
+    }
     f
   }
 
@@ -61,10 +62,10 @@ class EmailController(config: Config, userController: => UserController)(implici
   def sendPasswordResetEmail(userId: Int, token: String): Future[MessageResponse] = {
     val f = userController.getUser(userId).flatMap { res =>
       implicit val lang: Lang = Lang(res.languageCode)
-      val dest = EmailAddress (res.email, res.eveUserData.characterName)
-      val subject = Messages ("email.reset.subject", config.getString ("mailer.defaultSenderAlias"))
-      val link = "https://" + config.getString ("mailer.defaultResetDomain") + "/" + token
-      val body = Messages ("email.reset.body", res.eveUserData.characterName, config.getString ("mailer.defaultSenderAlias"), link)
+      val dest = EmailAddress(res.email, res.eveUserData.characterName)
+      val subject = Messages("email.reset.subject", config.getString("mailer.defaultSenderAlias"))
+      val link = "https://" + config.getString("mailer.defaultResetDomain") + "/" + token
+      val body = Messages("email.reset.body", res.eveUserData.characterName, config.getString("mailer.defaultSenderAlias"), link)
       this.send("reset")(dest, subject, body)
     }
 
@@ -72,7 +73,7 @@ class EmailController(config: Config, userController: => UserController)(implici
       case Success(r) =>
         logger.info(s"Successfully sent password reset email for userId=$userId event=email.reset.sent")
       case Failure(ex) =>
-      logger.info(s"Failed to send password reset email for userId=$userId event=email.reset.failure", ex)
+        logger.info(s"Failed to send password reset email for userId=$userId event=email.reset.failure", ex)
     }
     f
   }

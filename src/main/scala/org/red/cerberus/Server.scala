@@ -1,24 +1,15 @@
 package org.red.cerberus
 
-import org.red.cerberus.Implicits._
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
-import com.osinka.i18n.Lang
 import com.typesafe.scalalogging.LazyLogging
-import moe.pizza.eveapi.ApiKey
-import org.matthicks.mailgun.EmailAddress
-import org.quartz.Scheduler
-import org.quartz.impl.StdSchedulerFactory
+import org.red.cerberus.Implicits._
 import org.red.cerberus.controllers._
-import org.red.cerberus.daemons.{ScheduleDaemon, TeamspeakDaemon}
 import org.red.cerberus.endpoints.Base
 import org.red.cerberus.external.auth.EveApiClient
-import org.red.cerberus.util.{CredentialsType, LegacyCredentials}
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.io.{Source, StdIn}
+import scala.io.StdIn
 
 
 object Server extends App with LazyLogging with Base {
@@ -30,10 +21,10 @@ object Server extends App with LazyLogging with Base {
   lazy val authorizationController: AuthorizationController = new AuthorizationController(permissionController)
   lazy val userController: UserController = new UserController(permissionController, emailController, eveApiClient)
 
-  lazy val teamspeakController = new TeamspeakDaemon(cerberusConfig, userController)
-  lazy val scheduleController = new ScheduleDaemon(cerberusConfig, userController, eveApiClient)
+  lazy val teamspeakController = new TeamspeakController(cerberusConfig, userController)
+  lazy val scheduleController = new ScheduleController(cerberusConfig, userController, eveApiClient)
 
-  teamspeakController.createRegistrationAttempt(1)
+  teamspeakController.registerUserOnTeamspeak(1)
 
   val route: Route = this.baseRoute(authorizationController, userController, eveApiClient)
 

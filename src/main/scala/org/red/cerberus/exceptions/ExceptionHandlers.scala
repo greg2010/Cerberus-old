@@ -4,7 +4,6 @@ import com.typesafe.scalalogging.LazyLogging
 import org.postgresql.util.PSQLException
 
 import scala.concurrent.Future
-import scala.util.control.Exception.{Catch, handling}
 
 
 object ExceptionHandlers extends LazyLogging {
