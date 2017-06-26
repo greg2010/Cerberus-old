@@ -5,13 +5,14 @@ import java.util.UUID
 
 import com.roundeights.hasher.Implicits._
 import com.typesafe.scalalogging.LazyLogging
+import moe.pizza.eveapi.ApiKey
 import org.matthicks.mailgun.MessageResponse
 import org.red.cerberus.UserData
 import org.red.cerberus.exceptions._
 import org.red.cerberus.external.auth._
 import org.red.cerberus.util._
 import org.red.db.models.Coalition
-import org.red.db.models.Coalition.{PasswordResetRequestsRow, UsersRow}
+import org.red.db.models.Coalition.{EveApiRow, PasswordResetRequestsRow, UsersRow}
 import slick.dbio.Effect
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
@@ -22,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
 
 
-class UserController(permissionController: => PermissionController, emailController: => EmailController, eveApiClient: => EveApiClient)(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
+class UserController(permissionController: => PermissionController, emailController: => EmailController, eveApiClient: => EveApiClient, teamspeakController: => TeamspeakController)(implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
 
   private val rsg: Stream[Char] = Random.alphanumeric
 
@@ -200,22 +201,6 @@ class UserController(permissionController: => PermissionController, emailControl
     }
   }
 
-  def getTeamspeakUniqueId(userId: Int): Future[String] = {
-    val f = dbAgent.run(Coalition.TeamspeakUsers.filter(_.userId === userId).result)
-      .map { res =>
-        res.headOption match {
-          case Some(r) => r.uniqueId
-          case None => throw ResourceNotFoundException(s"No teamspeak uniqueId found for $userId")
-        }
-      }
-    f.onComplete {
-      case Success(res) =>
-        logger.info(s"Got teamspeak uniqueId for userId=$userId event=user.getTeamspeakUniqueId.success")
-      case Failure(ex) =>
-        logger.error(s"Failed to get teamspeak uniqueId for userId=$userId event=user.getTeamspeakUniqueId.failure")
-    }
-    f
-  }
 
 
   def updateUserData(eveUserData: EveUserData): Future[Unit] = {
@@ -233,6 +218,36 @@ class UserController(permissionController: => PermissionController, emailControl
           s"event=user.eveData.update.failure")
     }
     res
+  }
+
+  def triggerUpdates(userId: Int): Future[Unit] = {
+    teamspeakController.syncTeamspeakUser(userId)
+  }
+
+  def updateUser(userId: Int): Future[Unit] = {
+    val q = Coalition.Users.filter(_.id === userId).map(_.characterId)
+    val userData = dbAgent.run(q.result).flatMap { r =>
+      r.headOption match {
+        case Some(chId) => eveApiClient.fetchUserByCharacterId(chId)
+        case None => throw ResourceNotFoundException(s"User with id $userId doesn't exist")
+      }
+    }
+    val r = for {
+      data <- userData
+      _ <- updateUserData(data)
+      res <- triggerUpdates(userId)
+    } yield res
+    r.onComplete {
+      case Success(_) =>
+        logger.info(s"Updated user " +
+          s"userId=$userId " +
+          s"event=user.update.success")
+      case Failure(ex) =>
+        logger.error("Failed to update user " +
+          s"userId=$userId " +
+          s"event=user.update.failure", ex)
+    }
+    r
   }
 
   private def deleteObsoleteQuery(id: Int): FixedSqlAction[Int, NoStream, Effect.Write] =

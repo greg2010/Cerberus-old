@@ -19,10 +19,10 @@ object Server extends App with LazyLogging with Base {
   lazy val eveApiClient: EveApiClient = new EveApiClient(cerberusConfig)
   lazy val permissionController: PermissionController = new PermissionController(userController)
   lazy val authorizationController: AuthorizationController = new AuthorizationController(permissionController)
-  lazy val userController: UserController = new UserController(permissionController, emailController, eveApiClient)
+  lazy val userController: UserController = new UserController(permissionController, emailController, eveApiClient, teamspeakController)
 
   lazy val teamspeakController = new TeamspeakController(cerberusConfig, userController, permissionController)
-  lazy val scheduleController = new ScheduleController(cerberusConfig, userController, eveApiClient)
+  lazy val scheduleController = new ScheduleController(cerberusConfig, userController)
 
   teamspeakController.registerUserOnTeamspeak(1)
 

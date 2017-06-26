@@ -11,13 +11,14 @@ import org.red.cerberus.daemons.teamspeak.TeamspeakDaemon
 import org.red.cerberus.exceptions.{ConflictingEntityException, ExceptionHandlers, ResourceNotFoundException}
 import org.red.cerberus.jobs.teamspeak.RegistrationJoinListener
 import org.red.cerberus.util.FutureConverters._
-import org.red.cerberus.util.{TeamspeakGroupMapEntry, YamlParser}
+import org.red.cerberus.util.{PermissionBitEntry, TeamspeakGroupMapEntry, YamlParser}
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
 import io.circe.generic.auto._
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.io.Source
@@ -111,6 +112,40 @@ class TeamspeakController(config: Config, userController: => UserController,
     r
   }
 
+  def getTeamspeakUniqueId(userId: Int): Future[String] = {
+    val f = dbAgent.run(Coalition.TeamspeakUsers.filter(_.userId === userId).result)
+      .map { res =>
+        res.headOption match {
+          case Some(r) => r.uniqueId
+          case None => throw ResourceNotFoundException(s"No teamspeak uniqueId found for $userId")
+        }
+      }
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Got teamspeak uniqueId for userId=$userId event=user.getTeamspeakUniqueId.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to get teamspeak uniqueId for userId=$userId event=user.getTeamspeakUniqueId.failure")
+    }
+    f
+  }
+
+  def getUserIdByUniqueId(uniqueId: String): Future[Int] = {
+    val f = dbAgent.run(Coalition.TeamspeakUsers.filter(_.uniqueId === uniqueId).result)
+    .map { res =>
+      res.headOption match {
+        case Some(r) => r.userId
+        case None => throw ResourceNotFoundException(s"No teamspeak uniqueId found for uniqueId8=${uniqueId.substring(8)}")
+      }
+    }
+    f.onComplete {
+      case Success(res) =>
+        logger.info(s"Got teamspeak uniqueId for uniqueId8=${uniqueId.substring(8)} event=user.getTeamspeakUserId.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to get teamspeak uniqueId for uniqueId8=${uniqueId.substring(8)} event=user.getTeamspeakUserId.failure")
+    }
+    f
+  }
+
   def registerTeamspeakUser(userId: Int, uniqueId: String): Future[Unit] = {
     val f = dbAgent.run(Coalition.TeamspeakUsers.filter(_.uniqueId === uniqueId).take(1).result).flatMap { r =>
       r.headOption match {
@@ -129,37 +164,56 @@ class TeamspeakController(config: Config, userController: => UserController,
     f.map(_ => ())
   }
 
-  def syncTeamspeakUser(userId: Int): Future[Unit] = {
+  def getAllClients: Future[List[DatabaseClient]] = {
+    this.safeTeamspeakQuery(() => client.getDatabaseClients)().map(_.asScala.toList)
+  }
+
+  def getGroupsByUniqueId(uniqueId: String): Future[List[TeamspeakGroupMapEntry]] = {
+    this.safeTeamspeakQuery(() => client.getClientByUId(uniqueId))().map { resp =>
+      resp.getServerGroups.toList.flatMap(gId => teamspeakPermissionMap.find(_.teamspeak_group_id == gId))
+    }
+  }
+
+  def syncTeamspeakUser(uniqueId: String, permissions: Seq[PermissionBitEntry]): Future[Unit] = {
+    val shouldBeGroups = permissions.flatMap { p =>
+      teamspeakPermissionMap.find(_.bit_name == p.name).map(_.teamspeak_group_id)
+    }.toSet
+
     val f = (for {
-      uniqueId <- userController.getTeamspeakUniqueId(userId)
-      tsDbId <- this.safeTeamspeakQuery(() => client.getDatabaseClientByUId(uniqueId))()
-      permissions <- permissionController.calculateAclPermissionsByUserId(userId)
-      res <- Future.sequence {
-        permissions.map { g =>
-          teamspeakPermissionMap.find(_.bit_name == g.name) match {
-            case Some(teamspeakGroupMapEntry) =>
-              this.safeTeamspeakQuery(
-                () => client.addClientToServerGroup(teamspeakGroupMapEntry.teamspeak_group_id, tsDbId.getDatabaseId))()
-                .map(_.booleanValue())
-            case None =>
-              logger.debug(s"Permission ${g.name} doesn't exist in teamspeakGroupMapEntry, skipping")
-              Future {true}
-          }
+      tsDbId <- this.safeTeamspeakQuery(() => client.getDatabaseClientByUId(uniqueId))().map(_.getDatabaseId)
+      curGroups <- this.safeTeamspeakQuery(() => client.getClientByUId(uniqueId))().map(_.getServerGroups.toSet)
+      addToGroups <- Future.sequence {
+        (shouldBeGroups -- curGroups).toList.map { groupId =>
+          this.safeTeamspeakQuery(() => client.addClientToServerGroup(groupId, tsDbId))().map(_.booleanValue())
         }
       }
-    } yield res).map(_.forall(identity))
+      removeFromGroups <- Future.sequence {
+        (curGroups -- shouldBeGroups).toList.map { groupId =>
+          this.safeTeamspeakQuery(() => client.addClientToServerGroup(groupId, tsDbId))().map(_.booleanValue())
+        }
+      }
+    } yield addToGroups ++ removeFromGroups).map(_.forall(identity))
+
     f.onComplete {
       case Success(true) =>
-        logger.info(s"Successfully updated teamspeak permissions for userId=$userId event=teamspeak.updateUser.success")
+        logger.info(s"Successfully updated teamspeak permissions for uniqueId8=${uniqueId.substring(8)} event=teamspeak.updateUser.success")
       case Success(false) =>
-        logger.error(s"Updated user, but one or more requests failed userId=$userId event=teamspeak.updateUser.partial")
+        logger.error(s"Updated user, but one or more requests failed uniqueId8=${uniqueId.substring(8)} event=teamspeak.updateUser.partial")
       case Failure(ex) =>
-        logger.error(s"Failed to update user userId=$userId event=teamspeak.updateUser.failure", ex)
+        logger.error(s"Failed to update user uniqueId8=${uniqueId.substring(8)} event=teamspeak.updateUser.failure", ex)
     }
-    f.map( r =>
+    f.map { r =>
       if (r) ()
-      else throw new RuntimeException(s"Not all requests returned true for userId $userId")
-    )
+      else throw new RuntimeException(s"Not all requests returned true for userId ${uniqueId.substring(8)}")
+    }
+  }
+
+  def syncTeamspeakUser(userId: Int): Future[Unit] = {
+    for {
+      uniqueId <- this.getTeamspeakUniqueId(userId)
+      permissions <- permissionController.calculateAclPermissionsByUserId(userId)
+      res <- syncTeamspeakUser(uniqueId, permissions)
+    } yield res
   }
 
   private def safeQuery[T](f: () => T, timeout: FiniteDuration): Future[T] = {

@@ -17,7 +17,7 @@ class DaemonJob extends Job with LazyLogging {
     try {
       val dbAgent = context.getScheduler.getContext.get("dbAgent").asInstanceOf[JdbcBackend.Database]
       val scheduleController = context.getScheduler.getContext.get("scheduleController").asInstanceOf[ScheduleController]
-      dbAgent.run(Coalition.EveApi.result).flatMap { r =>
+      dbAgent.run(Coalition.Users.map(_.id).result).flatMap { r =>
         Future.sequence {
           r.map(scheduleController.scheduleUserUpdate)
         }.map(_.count(_.isDefined))

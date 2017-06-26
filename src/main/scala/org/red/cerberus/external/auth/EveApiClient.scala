@@ -12,6 +12,11 @@ class EveApiClient(config: Config)(implicit ec: ExecutionContext) extends LazyLo
   private val legacyClient = new LegacyClient(config, publicDataClient)
   private val ssoClient = new SSOClient(config, publicDataClient)
 
+
+  def fetchUserByCharacterId(characterId: Long): Future[EveUserData] = {
+    publicDataClient.fetchUserByCharacterId(characterId)
+  }
+
   def fetchUser(credentials: Credentials): Future[EveUserData] = {
     credentials match {
       case legacyCredentials: LegacyCredentials => legacyClient.fetchUser(legacyCredentials)

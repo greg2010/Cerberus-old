@@ -8,7 +8,7 @@ import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.impl.StdSchedulerFactory
 import org.quartz.{Scheduler, SimpleScheduleBuilder, TriggerKey}
-import org.red.cerberus.controllers.{ScheduleController, UserController}
+import org.red.cerberus.controllers.{ScheduleController, TeamspeakController, UserController}
 import org.red.cerberus.external.auth.EveApiClient
 import org.red.cerberus.jobs.quartz.DaemonJob
 import slick.jdbc.JdbcBackend
@@ -17,15 +17,15 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 
-class ScheduleDaemon(scheduleController: => ScheduleController, config: Config, userController: => UserController, eveApiClient: => EveApiClient)
+class ScheduleDaemon(scheduleController: => ScheduleController, config: Config, userController: => UserController)
                     (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
   val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
   private val daemonTriggerName = "userDaemon"
 
+  quartzScheduler.getContext.put("dbAgent", dbAgent)
   quartzScheduler.getContext.put("ec", ec)
   quartzScheduler.getContext.put("scheduleController", scheduleController)
   quartzScheduler.getContext.put("userController", userController)
-  quartzScheduler.getContext.put("eveApiClient", eveApiClient)
   quartzScheduler.start()
   val daemon: Cancelable =
     scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
