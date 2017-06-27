@@ -8,20 +8,20 @@ import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.{CronScheduleBuilder, TriggerKey}
 import org.red.cerberus.daemons.ScheduleDaemon
-import org.red.cerberus.exceptions.ResourceNotFoundException
-import org.red.cerberus.external.auth.EveApiClient
 import org.red.cerberus.jobs.quartz.UserJob
-import org.red.cerberus.util.CredentialsType
-import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
-import slick.jdbc.PostgresProfile.api._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 
+trait ScheduleService {
+  def scheduleUserUpdate(userId: Int): Future[Option[Date]]
+}
+
 class ScheduleController(config: Config, userController: => UserController)
-                        (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
+                        (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext)
+  extends ScheduleService with LazyLogging {
 
   private val daemon = new ScheduleDaemon(this, config, userController)
   private val quartzScheduler = daemon.quartzScheduler

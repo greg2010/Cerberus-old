@@ -1,30 +1,36 @@
-package org.red.cerberus.endpoints
+package org.red.cerberus.http.endpoints
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import com.typesafe.scalalogging.LazyLogging
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
 import moe.pizza.eveapi.ApiKey
 import org.red.cerberus._
 import org.red.cerberus.controllers.UserController
 import org.red.cerberus.external.auth.EveApiClient
+import org.red.cerberus.http._
 import org.red.cerberus.util.{LegacyCredentials, SSOAuthCode}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-trait Auth extends RouteHelpers with AuthenticationHandler {
+trait Auth
+  extends AuthenticationHandler
+    with LazyLogging
+    with FailFastCirceSupport {
   def authEndpoints(implicit userController: UserController, eveApiClient: EveApiClient): Route = pathPrefix("auth") {
     pathPrefix("login") {
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
           complete {
-            userController.legacyLogin(nameOrEmail, password).flatMap { userData =>
+            userController.verifyUser(nameOrEmail, password).flatMap { userMini =>
               Future {
                 DataResponse(
                   TokenResponse(
-                    access_token = generateAccessJwt(userData),
-                    refresh_token = generateRefreshJwt(userData)
+                    access_token = generateAccessJwt(userMini),
+                    refresh_token = generateRefreshJwt(userMini)
                   )
                 )
               }
@@ -78,14 +84,14 @@ trait Auth extends RouteHelpers with AuthenticationHandler {
         pathPrefix("password") {
           (post & entity(as[passwordResetRequestReq])) { passwordResetRequest =>
             complete {
-              userController.initializePasswordReset(passwordResetRequest.email)
+              userController.requestPasswordReset(passwordResetRequest.email)
                 // https://stackoverflow.com/a/33389526
                 .map(_ => HttpResponse(StatusCodes.Accepted))
             }
           } ~
             (put & entity(as[passwordChangeWithTokenReq])) { passwordChangeRequest =>
               complete {
-                userController.resetPasswordWithToken(
+                userController.completePasswordReset(
                   passwordChangeRequest.email,
                   passwordChangeRequest.token,
                   passwordChangeRequest.new_password)

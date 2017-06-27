@@ -4,8 +4,7 @@ import akka.http.scaladsl.server.RequestContext
 import com.netaporter.uri.{PathPart, Uri}
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
-import org.red.cerberus.UserData
-import org.red.cerberus.util.{PermissionBitEntry, YamlParser}
+import org.red.cerberus.util.{PermissionBitEntry, UserMini, YamlParser}
 
 import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
@@ -63,8 +62,9 @@ class AuthorizationController(permissionController: => PermissionController)(imp
     }
 
 
-  def customAuthorization(userData: UserData)(ctx: RequestContext): Future[Boolean] = {
-    Future {
+  // TODO: reimplement
+  def customAuthorization(userData: UserMini)(ctx: RequestContext): Future[Boolean] = {
+    Future { true } /*
       val routeBinPermission =
         permissionController.getBinPermissions(
           getPermissionsForUri(Uri.parse(ctx.unmatchedPath.toString), ctx.request.method.value)
@@ -72,6 +72,6 @@ class AuthorizationController(permissionController: => PermissionController)(imp
       logger.info(s"Calculated path=${ctx.unmatchedPath.toString} permissions " +
         s"pathPermission=$routeBinPermission userPermission=${userData.permissions}")
       (routeBinPermission & userData.permissions) == routeBinPermission
-    }
+    }*/
   }
 }

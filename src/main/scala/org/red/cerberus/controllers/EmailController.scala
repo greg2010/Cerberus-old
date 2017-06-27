@@ -11,7 +11,18 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 
-class EmailController(config: Config, userController: => UserController)(implicit ec: ExecutionContext) extends LazyLogging {
+trait EmailService {
+  def send(msgType: String)
+          (to: EmailAddress,
+           subject: String,
+           body: String,
+           from: EmailAddress): Future[MessageResponse]
+  def sendPasswordResetEmail(userId: Int, token: String): Future[MessageResponse]
+  def sendPasswordChangeEmail(userId: Int): Future[MessageResponse]
+}
+
+class EmailController(config: Config, userController: => UserController)(implicit ec: ExecutionContext)
+  extends EmailService with LazyLogging {
   private val mailer = new Mailgun(config.getString("mailer.domain"), config.getString("mailer.apiKey"))
   private val defaultEmailSender = EmailAddress(
     config.getString("mailer.defaultSenderEmail"),
@@ -33,30 +44,6 @@ class EmailController(config: Config, userController: => UserController)(implici
       emailSendCallback(from, to, subject, msgType)
     }
     f
-  }
-
-  def emailSendCallback(from: EmailAddress,
-                        to: EmailAddress,
-                        subject: String,
-                        msgType: String)
-                       (maybeResult: Try[MessageResponse]): Unit = {
-    maybeResult match {
-      case Success(response) =>
-        logger.info(s"Successfully sent email " +
-          s"from=${from.toString} " +
-          s"to=${to.toString} " +
-          s"subject=$subject " +
-          s"messageType=$msgType " +
-          s"mailgunMessageId=${response.id} " +
-          s"event=email.send.success")
-      case Failure(ex) =>
-        logger.error("Failed to send email " +
-          s"from=${from.toString} " +
-          s"to=${to.toString} " +
-          s"subject=$subject " +
-          s"messageType=$msgType " +
-          s"event=email.send.failure", ex)
-    }
   }
 
   def sendPasswordResetEmail(userId: Int, token: String): Future[MessageResponse] = {
@@ -94,5 +81,29 @@ class EmailController(config: Config, userController: => UserController)(implici
         logger.info(s"Failed to send password change email for userId=$userId event=email.change.failure", ex)
     }
     f
+  }
+
+  private def emailSendCallback(from: EmailAddress,
+                                to: EmailAddress,
+                                subject: String,
+                                msgType: String)
+                               (maybeResult: Try[MessageResponse]): Unit = {
+    maybeResult match {
+      case Success(response) =>
+        logger.info(s"Successfully sent email " +
+          s"from=${from.toString} " +
+          s"to=${to.toString} " +
+          s"subject=$subject " +
+          s"messageType=$msgType " +
+          s"mailgunMessageId=${response.id} " +
+          s"event=email.send.success")
+      case Failure(ex) =>
+        logger.error("Failed to send email " +
+          s"from=${from.toString} " +
+          s"to=${to.toString} " +
+          s"subject=$subject " +
+          s"messageType=$msgType " +
+          s"event=email.send.failure", ex)
+    }
   }
 }

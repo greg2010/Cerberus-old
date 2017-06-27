@@ -4,6 +4,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.quartz.{Job, JobExecutionContext}
 import org.red.cerberus.controllers.UserController
 import org.red.cerberus.exceptions.ExceptionHandlers
+
 import scala.concurrent.ExecutionContext
 
 

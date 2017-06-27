@@ -8,8 +8,7 @@ import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.impl.StdSchedulerFactory
 import org.quartz.{Scheduler, SimpleScheduleBuilder, TriggerKey}
-import org.red.cerberus.controllers.{ScheduleController, TeamspeakController, UserController}
-import org.red.cerberus.external.auth.EveApiClient
+import org.red.cerberus.controllers.{ScheduleController, UserController}
 import org.red.cerberus.jobs.quartz.DaemonJob
 import slick.jdbc.JdbcBackend
 

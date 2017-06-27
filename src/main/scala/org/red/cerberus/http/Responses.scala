@@ -1,5 +1,4 @@
-package org.red.cerberus
-
+package org.red.cerberus.http
 
 case class DataResponse[T](data: T)
 

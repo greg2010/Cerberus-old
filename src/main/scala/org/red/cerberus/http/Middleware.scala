@@ -1,5 +1,4 @@
-package org.red.cerberus
-
+package org.red.cerberus.http
 
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._

@@ -1,4 +1,4 @@
-package org.red.cerberus
+package org.red.cerberus.http
 
 import akka.http.scaladsl.model.headers.{HttpChallenge, HttpChallenges, HttpCredentials}
 import akka.http.scaladsl.server.Directives.AuthenticationResult
@@ -6,7 +6,9 @@ import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
 import io.circe.parser
 import io.circe.syntax._
+import org.red.cerberus.cerberusConfig
 import org.red.cerberus.exceptions.AuthenticationException
+import org.red.cerberus.util.{PrivateClaim, UserMini}
 import pdi.jwt._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -15,33 +17,11 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 
-case class UserData(name: String, id: Int, characterId: Long, permissions: Long) {
-  def toPrivateClaim: PrivateClaim = {
-    PrivateClaim(
-      nme = name,
-      id = id,
-      cid = characterId,
-      prm = permissions
-    )
-  }
-}
-
-case class PrivateClaim(nme: String, id: Int, cid: Long, prm: Long) {
-  def toUserData: UserData = {
-    UserData(
-      name = nme,
-      id = id,
-      characterId = cid,
-      permissions = prm
-    )
-  }
-}
-
 trait AuthenticationHandler extends LazyLogging {
 
 
   protected def authWithCustomJwt(credentials: Option[HttpCredentials]):
-  Future[AuthenticationResult[UserData]] =
+  Future[AuthenticationResult[UserMini]] =
     Future {
       credentials match {
         case Some(creds) =>
@@ -59,12 +39,12 @@ trait AuthenticationHandler extends LazyLogging {
       }
     }
 
-  protected def generateAccessJwt(userData: UserData): String = {
+  protected def generateAccessJwt(userData: UserMini): String = {
     logger.info(s"generating access token for userId=${userData.id}")
     encodeJwt(generatePayload(userData, accessExpiration))
   }
 
-  protected def generateRefreshJwt(userData: UserData): String = {
+  protected def generateRefreshJwt(userData: UserMini): String = {
     logger.info(s"generating refresh token for userId=${userData.id}")
     encodeJwt(generatePayload(userData, refreshExpiration))
   }
@@ -73,7 +53,7 @@ trait AuthenticationHandler extends LazyLogging {
     JwtCirce.isValid(token, key, Seq(algorithm))
   }
 
-  protected def extractPayloadFromToken(token: String): UserData = {
+  protected def extractPayloadFromToken(token: String): UserMini = {
     extractPayload(decodeJwt(token))
   }
 
@@ -90,7 +70,7 @@ trait AuthenticationHandler extends LazyLogging {
     JwtCirce.encode(header, payload, key)
   }
 
-  private def generatePayload(userData: UserData, expiration: Long): JwtClaim = {
+  private def generatePayload(userData: UserMini, expiration: Long): JwtClaim = {
     JwtClaim()
       .by(issuer)
       .to(audience)
@@ -110,7 +90,7 @@ trait AuthenticationHandler extends LazyLogging {
     }
   }
 
-  private def extractPayload(jwtClaim: JwtClaim): UserData = {
+  private def extractPayload(jwtClaim: JwtClaim): UserMini = {
     jwtClaim.subject match {
       case Some(sub) =>
         parser.decode[PrivateClaim](sub) match {

@@ -1,17 +1,14 @@
 package org.red.cerberus.daemons.teamspeak
 
-import com.gilt.gfc.concurrent.ScalaFutures.FutureOps
 import com.github.theholywaffle.teamspeak3.TS3Query.FloodRate
-import com.github.theholywaffle.teamspeak3.api.reconnect.{DisconnectingConnectionHandler, ReconnectStrategy}
+import com.github.theholywaffle.teamspeak3.api.reconnect.ReconnectStrategy
 import com.github.theholywaffle.teamspeak3.{TS3ApiAsync, TS3Config, TS3Query}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import monix.execution.Cancelable
 import monix.execution.Scheduler.{global => scheduler}
 
-import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.concurrent.ExecutionContext
 
 
 class TeamspeakDaemon(config: Config)

@@ -1,4 +1,4 @@
-package org.red.cerberus
+package org.red.cerberus.http
 
 import akka.http.scaladsl.model.DateTime
 import akka.http.scaladsl.model.headers._

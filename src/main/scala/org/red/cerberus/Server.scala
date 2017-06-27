@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.Implicits._
 import org.red.cerberus.controllers._
-import org.red.cerberus.endpoints.Base
+import org.red.cerberus.http.endpoints.Base
 import org.red.cerberus.external.auth.EveApiClient
 
 import scala.concurrent.ExecutionContext.Implicits.global

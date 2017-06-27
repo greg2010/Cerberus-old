@@ -3,9 +3,10 @@ package org.red.cerberus.controllers
 import com.gilt.gfc.concurrent.ScalaFutures.FutureOps
 import com.github.theholywaffle.teamspeak3.api.CommandFuture
 import com.github.theholywaffle.teamspeak3.api.event._
-import com.github.theholywaffle.teamspeak3.api.wrapper.{DatabaseClient, DatabaseClientInfo}
+import com.github.theholywaffle.teamspeak3.api.wrapper.DatabaseClient
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
+import io.circe.generic.auto._
 import monix.execution.Scheduler.{global => scheduler}
 import org.red.cerberus.daemons.teamspeak.TeamspeakDaemon
 import org.red.cerberus.exceptions.{ConflictingEntityException, ExceptionHandlers, ResourceNotFoundException}
@@ -15,10 +16,8 @@ import org.red.cerberus.util.{PermissionBitEntry, TeamspeakGroupMapEntry, YamlPa
 import org.red.db.models.Coalition
 import slick.jdbc.JdbcBackend
 import slick.jdbc.PostgresProfile.api._
-import io.circe.generic.auto._
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.io.Source

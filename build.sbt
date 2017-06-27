@@ -18,7 +18,7 @@ assemblyMergeStrategy in assembly := {
 
 scalacOptions ++= Seq("-deprecation", "-feature")
 
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials-g")
 
 resolvers ++=
   Seq(Resolver.bintrayRepo("andimiller", "maven"),
@@ -26,6 +26,8 @@ resolvers ++=
 
 val circeVersion = "0.8.0"
 libraryDependencies ++= Seq(
+  "org.scala-lang.modules" %% "scala-async" % "0.9.6",
+  "org.scala-stm" %% "scala-stm" % "0.8",
   "com.typesafe.akka" %% "akka-http" % "10.0.6",
   "ch.megard" %% "akka-http-cors" % "0.2.1",
   "de.heikoseeberger" %% "akka-http-circe" % "1.16.0",
@@ -41,6 +43,7 @@ libraryDependencies ++= Seq(
   "net.joelinn" % "quartz-redis-jobstore" % "1.1.8",
   "moe.pizza" %% "eveapi" % "0.58-SNAPSHOT",
   "org.red" %% "reddb" % "1.0.7-SNAPSHOT",
+  //"org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "net.troja.eve" % "eve-esi" % "1.0.0",
   "io.monix" %% "monix" % "2.3.0",
   "org.matthicks" %% "mailgun4s" % "1.0.4",

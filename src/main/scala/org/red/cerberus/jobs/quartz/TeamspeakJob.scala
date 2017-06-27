@@ -2,12 +2,12 @@ package org.red.cerberus.jobs.quartz
 
 import com.typesafe.scalalogging.LazyLogging
 import org.quartz.{Job, JobExecutionContext}
-import org.red.cerberus.controllers.{TeamspeakController, UserController}
+import org.red.cerberus.controllers.TeamspeakController
 import org.red.cerberus.exceptions.{ExceptionHandlers, ResourceNotFoundException}
 import slick.jdbc.JdbcBackend
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 class TeamspeakJob extends Job with LazyLogging {
   override def execute(context: JobExecutionContext): Unit = {

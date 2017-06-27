@@ -3,7 +3,7 @@ package org.red.cerberus.util
 import java.sql.Timestamp
 
 import moe.pizza.eveapi.ApiKey
-import org.red.db.models.Coalition.UsersViewRow
+import org.red.db.models.Coalition.{UsersRow, UsersViewRow}
 
 sealed trait Credentials
 
@@ -21,7 +21,15 @@ case class User(eveUserData: EveUserData,
                 isBanned: Boolean,
                 creationTime: Timestamp,
                 lastLoggedIn: Option[Timestamp],
-                languageCode: String)
+                languageCode: String) {
+  def toUserMini: UserMini = {
+    UserMini(
+      name = this.eveUserData.characterName,
+      id = this.userId,
+      characterId = this.eveUserData.characterId
+    )
+  }
+}
 
 object User {
   def apply(usersViewRow: UsersViewRow): User = {
@@ -68,3 +76,41 @@ object CredentialsType extends Enumeration {
 case class PermissionBitEntry(name: String, bit_position: Int, description: String)
 
 case class TeamspeakGroupMapEntry(bit_name: String, teamspeak_group_id: Int)
+
+case class UserMini(name: String, id: Int, characterId: Long) {
+  def toPrivateClaim: PrivateClaim = {
+    PrivateClaim(
+      nme = name,
+      id = id,
+      cid = characterId
+    )
+  }
+
+  def fromUser(user: User): UserMini = {
+    UserMini(
+      name = user.eveUserData.characterName,
+      id = user.userId,
+      characterId = user.eveUserData.characterId
+    )
+  }
+}
+
+object UserMini {
+  def apply(usersRow: UsersRow): UserMini = {
+    UserMini(
+      name = usersRow.name,
+      id = usersRow.id,
+      characterId = usersRow.characterId
+    )
+  }
+}
+
+case class PrivateClaim(nme: String, id: Int, cid: Long) {
+  def toUserData: UserMini = {
+    UserMini(
+      name = nme,
+      id = id,
+      characterId = cid
+    )
+  }
+}
