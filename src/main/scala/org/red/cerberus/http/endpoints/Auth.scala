@@ -21,6 +21,17 @@ trait Auth
     with LazyLogging
     with FailFastCirceSupport {
   def authEndpoints(implicit userController: UserController, eveApiClient: EveApiClient): Route = pathPrefix("auth") {
+    pathPrefix("api") {
+      pathPrefix("legacy") {
+        (get & parameters("key_id", "verification_code", "name".?)) { (keyId, verificationCode, name) =>
+          complete {
+            val credentials = LegacyCredentials(ApiKey(keyId.toInt, verificationCode), name)
+            eveApiClient.fetchUser(credentials)
+              .map(DataResponse.apply)
+          }
+        }
+      }
+    } ~
     pathPrefix("login") {
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
@@ -42,7 +53,7 @@ trait Auth
               userController.createUser(req.email, Some(req.password),
                 LegacyCredentials(
                   ApiKey(req.key_id.toInt, req.verification_code),
-                  req.name)
+                  Some(req.name))
               ).map { _ =>
                 HttpResponse(StatusCodes.Created)
               }

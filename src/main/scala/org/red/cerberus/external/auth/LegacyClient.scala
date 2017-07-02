@@ -1,8 +1,9 @@
 package org.red.cerberus.external.auth
 
+import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
-import moe.pizza.eveapi.EVEAPI
+import moe.pizza.eveapi.{ApiKey, EVEAPI}
 import org.red.cerberus.exceptions.{BadEveCredential, ResourceNotFoundException}
 import org.red.cerberus.util.{EveUserData, LegacyCredentials}
 
@@ -10,16 +11,32 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 
-private[this] class LegacyClient(config: Config, publicDataClient: PublicDataClient)(implicit ec: ExecutionContext) extends LazyLogging {
+private[this] class LegacyClient(config: Config, publicDataClient: PublicDataClient)
+                                (implicit ec: ExecutionContext) extends LazyLogging {
   private val minimumMask: Int = config.getInt("legacyAPI.minimumKeyMask")
 
-  def fetchUser(legacyCredentials: LegacyCredentials): Future[EveUserData] = {
+  def fetchUser(legacyCredentials: LegacyCredentials): Future[NonEmptyList[EveUserData]] = {
     lazy val client = new EVEAPI()(Some(legacyCredentials.apiKey), ec)
     val f = client.account.APIKeyInfo().flatMap {
       case Success(res) if (res.result.key.accessMask & minimumMask) == minimumMask =>
-        res.result.key.rowset.row.find(_.characterName == legacyCredentials.name) match {
-          case Some(ch) => publicDataClient.fetchUserByCharacterId(ch.characterID.toLong)
-          case None => throw ResourceNotFoundException(s"Character ${legacyCredentials.name} not found")
+        legacyCredentials.name match {
+          case Some(n) =>
+            res.result.key.rowset.row.find(_.characterName == n) match {
+              case Some(ch) => publicDataClient.fetchUserByCharacterId(ch.characterID.toLong)
+                .map( x => NonEmptyList(x, List()))
+              case None => throw ResourceNotFoundException(s"Character ${legacyCredentials.name} not found")
+            }
+          case None =>
+            Future.sequence {
+              res.result.key.rowset.row.map { ch =>
+                publicDataClient.fetchUserByCharacterId(ch.characterID.toLong)
+              }
+            }.map { x =>
+              NonEmptyList.fromList(x.toList) match {
+                case Some(l) => l
+                case None => throw ResourceNotFoundException("No characters found for the API key")
+              }
+            }
         }
       case Failure(ex) => throw BadEveCredential(legacyCredentials, "Invalid key", -2)
       case _ => throw BadEveCredential(legacyCredentials, "Invalid mask", -1)
@@ -27,7 +44,7 @@ private[this] class LegacyClient(config: Config, publicDataClient: PublicDataCli
     f.onComplete {
       case Success(res) =>
         logger.info(s"Fetched user using legacy API " +
-          s"characterId=${res.characterId} " +
+          s"characterIds=${res.map(_.characterId).toList.mkString(",")} " +
           s"event=external.auth.legacy.fetch.success")
       case Failure(ex) =>
         logger.error(s"Failed to fetch user using legacy API " +

@@ -1,5 +1,6 @@
 package org.red.cerberus.external.auth
 
+import cats.data.NonEmptyList
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.util._
@@ -17,10 +18,11 @@ class EveApiClient(config: Config)(implicit ec: ExecutionContext) extends LazyLo
     publicDataClient.fetchUserByCharacterId(characterId)
   }
 
-  def fetchUser(credentials: Credentials): Future[EveUserData] = {
+  def fetchUser(credentials: Credentials): Future[NonEmptyList[EveUserData]] = {
     credentials match {
       case legacyCredentials: LegacyCredentials => legacyClient.fetchUser(legacyCredentials)
       case ssoCredentials: SSOCredentials => ssoClient.fetchUser(ssoCredentials)
+        .map(x => NonEmptyList(x, List()))
     }
   }
 

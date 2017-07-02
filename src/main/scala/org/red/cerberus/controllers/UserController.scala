@@ -77,9 +77,9 @@ class UserController(permissionController: => PermissionController,
     // Queries eve XML/ESI API to confirm that user indeed owns the account
     eveApiClient.fetchUser(credentials).flatMap { eveUserData =>
       val action = (for {
-        _ <- updateUserDataQuery(eveUserData)
-        userId <- insertToUsersQuery(eveUserData)
-        _ <- credsQuery(userId, eveUserData)
+        _ <- updateUserDataQuery(eveUserData.head)
+        userId <- insertToUsersQuery(eveUserData.head)
+        _ <- credsQuery(userId, eveUserData.head)
       } yield userId).transactionally
       val f = dbAgent.run(action)
         .flatMap(getUserMini)

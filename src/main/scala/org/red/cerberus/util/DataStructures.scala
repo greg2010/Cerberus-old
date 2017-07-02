@@ -7,7 +7,7 @@ import org.red.db.models.Coalition.{UsersRow, UsersViewRow}
 
 sealed trait Credentials
 
-case class LegacyCredentials(apiKey: ApiKey, name: String) extends Credentials
+case class LegacyCredentials(apiKey: ApiKey, name: Option[String]) extends Credentials
 
 case class SSOCredentials(refreshToken: String, accessToken: String) extends Credentials
 

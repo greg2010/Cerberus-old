@@ -19,7 +19,6 @@ class TeamspeakDaemon(config: Config)
   ts3Conf.setFloodRate(FloodRate.UNLIMITED)
   private val connectionHandler = new CustomConnectionHandler(config)
   ts3Conf.setConnectionHandler(connectionHandler)
-  ts3Conf.setReconnectStrategy(ReconnectStrategy.userControlled())
 
   private val ts3Query = new TS3Query(ts3Conf)
   val client: TS3ApiAsync = ts3Query.getAsyncApi

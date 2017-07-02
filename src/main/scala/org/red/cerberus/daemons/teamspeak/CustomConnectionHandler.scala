@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.gilt.gfc.concurrent.ScalaFutures.FutureOps
 import com.github.theholywaffle.teamspeak3.TS3Query
-import com.github.theholywaffle.teamspeak3.api.reconnect.ConnectionHandler
+import com.github.theholywaffle.teamspeak3.api.reconnect.{ConnectionHandler, DisconnectingConnectionHandler}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import monix.execution.Cancelable
@@ -15,7 +15,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
 
-private[this] class CustomConnectionHandler(config: Config)(implicit ec: ExecutionContext) extends ConnectionHandler with LazyLogging {
+private[this] class CustomConnectionHandler(config: Config)(implicit ec: ExecutionContext)
+  extends ConnectionHandler with LazyLogging {
   private val rsg: Stream[Char] = Random.alphanumeric
 
   def generatePostfix: String = rsg.take(4).mkString
@@ -25,9 +26,9 @@ private[this] class CustomConnectionHandler(config: Config)(implicit ec: Executi
   def isConnected: Boolean = connected.get()
 
   def connect(ts3Query: TS3Query): Cancelable = {
-    scheduler.scheduleWithFixedDelay(0.seconds, 15.seconds) {
+    scheduler.scheduleWithFixedDelay(0.seconds, 10.seconds) {
       if (!isConnected) {
-        Future(ts3Query.connect()).withTimeout(13.seconds)
+        Future(ts3Query.connect()).withTimeout(8.seconds)
           .onComplete {
             case Success(r) =>
               logger.info(s"Connected to teamspeak teamspeakHost=${config.getString("ts3.host")} " +
@@ -36,7 +37,7 @@ private[this] class CustomConnectionHandler(config: Config)(implicit ec: Executi
               logger.error("Failed to connect to teamspeak, retrying event=teamspeak.connect.failure")
           }
       } else {
-        logger.debug("connected")
+        logger.debug("Have connection to the teamspeak server event=teamspeak.connect.success")
       }
     }
   }
@@ -73,8 +74,7 @@ private[this] class CustomConnectionHandler(config: Config)(implicit ec: Executi
           s"ping=${r.getPing} " +
           s"event=teamspeak.connect.success")
       case Failure(ex) =>
-        logger.error("Failed to connect to TS3 server event=teamspeak.connect.failure", ex)
-        //connected.set(false)
+        logger.error("Failed to get TS3 server info event=teamspeak.connect.failure", ex)
     }
   }
 }

@@ -12,7 +12,73 @@ consumes:
 produces:
 - application/json
 
+definitions:
+  EveCharacterInfo:
+    type: object
+    required:
+      - characterId
+      - characterName
+      - corporationId
+      - corporationName
+      - corporationTicker
+    properties:
+      characterId:
+        type: integer
+        format: int64
+      characterName:
+        type: string
+      corporationId:
+        type: integer
+        format: int64
+      corporationName:
+        type: string
+      corporationTicker:
+        type: string
+      allianceId:
+        type: integer
+        format: int64
+      allianceName:
+        type: string
+      allianceTicker:
+        type: string
+
+
 paths:
+  /auth/api/legacy:
+    get:
+      operationId: "api_legacy"
+      summary: |
+        Gets user credentials from an API key
+      parameters:
+        -
+          name: key_id
+          in: query
+          description: API key id
+          required: true
+          type: integer
+        -
+          name: verification_code
+          in: query
+          description: API vCode
+          required: true
+          type: string
+        -
+          name: name
+          in: query
+          description: Character name
+          required: false
+          type: string
+      responses:
+        200:
+          description: Successful response
+          schema:
+            title: credentials
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/EveCharacterInfo"
   /auth/login/legacy:
     get:
       operationId: "login_legacy"
@@ -138,15 +204,15 @@ paths:
       summary: |
         Requests password reset for user by email
       parameters:
-    - name: user_data
-      in: body
-      description: Object with user's email
-      required: true
-      schema:
-        type: object
-        properties:
-          email:
-            type: string
+      - name: user_data
+        in: body
+        description: Object with user's email
+        required: true
+        schema:
+          type: object
+          properties:
+            email:
+              type: string
       responses:
         202:
           description: Request accepted
@@ -155,19 +221,19 @@ paths:
       summary: |
         Resets user password using token for authorization
       parameters:
-    - name: user_data
-      in: body
-      description: Object with user's new password email and token
-      required: true
-      schema:
-        type: object
-        properties:
-          email:
-            type: string
-          token:
-            type: string
-          new_password:
-            type: string
+      - name: user_data
+        in: body
+        description: Object with user's new password email and token
+        required: true
+        schema:
+          type: object
+          properties:
+            email:
+              type: string
+            token:
+              type: string
+            new_password:
+              type: string
       responses:
         204:
           description: Password succesffuly reset
@@ -184,19 +250,19 @@ paths:
           description: Successful response
   /user/self/password:
     put:
-      operationId: "password_change_with_token"
+      operationId: "password_change"
       summary: |
         Resets user password
       parameters:
-    - name: user_data
-      in: body
-      description: Object with user's new password
-      required: true
-      schema:
-        type: object
-        properties:
-          new_password:
-            type: string
+      - name: user_data
+        in: body
+        description: Object with user's new password
+        required: true
+        schema:
+          type: object
+          properties:
+            new_password:
+              type: string
       responses:
         204:
           description: Password succesffuly reset

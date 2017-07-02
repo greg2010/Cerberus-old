@@ -27,6 +27,7 @@ resolvers ++=
 val circeVersion = "0.8.0"
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-async" % "0.9.6",
+  "org.typelevel" %% "cats" % "0.9.0",
   "org.scala-stm" %% "scala-stm" % "0.8",
   "com.typesafe.akka" %% "akka-http" % "10.0.6",
   "ch.megard" %% "akka-http-cors" % "0.2.1",
