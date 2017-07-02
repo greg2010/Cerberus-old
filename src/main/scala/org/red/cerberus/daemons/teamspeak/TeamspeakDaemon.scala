@@ -16,7 +16,7 @@ class TeamspeakDaemon(config: Config)
 
   private val ts3Conf = new TS3Config
   ts3Conf.setHost(config.getString("ts3.host"))
-  ts3Conf.setFloodRate(FloodRate.UNLIMITED)
+  ts3Conf.setFloodRate(FloodRate.DEFAULT)
   private val connectionHandler = new CustomConnectionHandler(config)
   ts3Conf.setConnectionHandler(connectionHandler)
 

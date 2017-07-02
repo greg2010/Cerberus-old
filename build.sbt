@@ -18,7 +18,7 @@ assemblyMergeStrategy in assembly := {
 
 scalacOptions ++= Seq("-deprecation", "-feature")
 
-credentials += Credentials(Path.userHome / ".ivy2" / ".credentials-g")
+credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 resolvers ++=
   Seq(Resolver.bintrayRepo("andimiller", "maven"),
@@ -46,6 +46,7 @@ libraryDependencies ++= Seq(
   "org.red" %% "reddb" % "1.0.7-SNAPSHOT",
   //"org.red" %% "eveapi-esi" % "1.0.0-SNAPSHOT",
   "net.troja.eve" % "eve-esi" % "1.0.0",
+  "org.glassfish.jersey.core" % "jersey-common" % "2.25.1",
   "io.monix" %% "monix" % "2.3.0",
   "org.matthicks" %% "mailgun4s" % "1.0.4",
   "com.osinka.i18n" %% "scala-i18n" % "1.0.2",

@@ -24,12 +24,11 @@ object Server extends App with LazyLogging with Base {
   lazy val teamspeakController = new TeamspeakController(cerberusConfig, userController, permissionController)
   lazy val scheduleController = new ScheduleController(cerberusConfig, userController)
 
-  teamspeakController.registerUserOnTeamspeak(1)
-
   val route: Route = this.baseRoute(authorizationController, userController, eveApiClient)
 
-  val server = Http().bindAndHandle(route, "0.0.0.0", 8080)
-  logger.debug(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
+  val server = Http().bindAndHandle(route, cerberusConfig.getString("host"), cerberusConfig.getInt("port"))
+  logger.debug(s"Server online at http://${cerberusConfig.getString("host")}:${cerberusConfig.getInt("port")}/\n" +
+    s"Press RETURN to stop...")
   StdIn.readLine() // let it run until user presses return
   server
     .flatMap(_.unbind()) // trigger unbinding from the port
