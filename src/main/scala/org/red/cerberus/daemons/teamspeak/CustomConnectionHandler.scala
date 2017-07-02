@@ -59,7 +59,7 @@ private[this] class CustomConnectionHandler(config: Config)(implicit ec: Executi
         client.selectVirtualServerById(config.getInt("ts3.virtualServerId"))
       )
       _ <- FutureConverters.commandToScalaFuture(
-        client.setNickname(config.getString("ts3.botName") + generatePostfix)
+        client.setNickname(config.getString("ts3.botName") + "_" + generatePostfix)
       )
       _ <- FutureConverters.commandToScalaFuture(
         client.registerAllEvents()

@@ -9,9 +9,18 @@ scalaVersion := "2.12.2"
 assemblyJarName in assembly := "cerberus.jar"
 mainClass in assembly := Some("org.red.cerberus.Server")
 
+val meta = """.*(RSA|DSA)$""".r
+
 // Hax to get .jar to execute
 assemblyMergeStrategy in assembly := {
-  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case PathList("META-INF", xs @ _*) =>
+    xs.map(_.toLowerCase) match {
+      case ("manifest.mf" :: Nil) |
+           ("index.list" :: Nil) |
+           ("dependencies" :: Nil) |
+           ("bckey.dsa" :: Nil) => MergeStrategy.discard
+      case _ => MergeStrategy.first
+    }
   case PathList("reference.conf") => MergeStrategy.concat
   case PathList(_*) => MergeStrategy.first
 }
