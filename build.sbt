@@ -37,7 +37,6 @@ val circeVersion = "0.8.0"
 libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-async" % "0.9.6",
   "org.typelevel" %% "cats" % "0.9.0",
-  "org.scala-stm" %% "scala-stm" % "0.8",
   "com.typesafe.akka" %% "akka-http" % "10.0.6",
   "ch.megard" %% "akka-http-cors" % "0.2.1",
   "de.heikoseeberger" %% "akka-http-circe" % "1.16.0",
@@ -46,7 +45,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
   "com.roundeights" %% "hasher" % "1.2.0",
-  "com.github.pukkaone" % "logback-gelf" % "1.1.10",
   "io.lemonlabs" %% "scala-uri" % "0.4.16",
   "org.scalaj" %% "scalaj-http" % "2.3.0",
   "org.quartz-scheduler" % "quartz" % "2.3.0",

@@ -4,24 +4,12 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    <appender name="GRAYLOG" class="com.github.pukkaone.gelf.logback.GelfAppender">
-        <graylogHost>graylog.red.greg2010.me</graylogHost>
-        <levelIncluded>true</levelIncluded>
-        <locationIncluded>false</locationIncluded>
-        <loggerIncluded>true</loggerIncluded>
-        <markerIncluded>false</markerIncluded>
-        <mdcIncluded>false</mdcIncluded>
-        <threadIncluded>false</threadIncluded>
-        <facility>gelf-java</facility>
-        <additionalField>application=cerberus</additionalField>
-    </appender>
 
     <logger name="slick" level="WARN"/>
     <logger name="com.zaxxer.hikari" level="WARN"/>
     <logger name="io.netty" level="WARN"/>
 
     <root level="debug">
-        <appender-ref ref="GRAYLOG"/>
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>
