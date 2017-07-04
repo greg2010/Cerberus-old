@@ -3,7 +3,7 @@ package org.red.cerberus.controllers
 import com.gilt.gfc.concurrent.ScalaFutures.FutureOps
 import com.github.theholywaffle.teamspeak3.api.CommandFuture
 import com.github.theholywaffle.teamspeak3.api.event._
-import com.github.theholywaffle.teamspeak3.api.wrapper.DatabaseClient
+import com.github.theholywaffle.teamspeak3.api.wrapper.{Client, DatabaseClient, DatabaseClientInfo}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.generic.auto._
@@ -36,7 +36,6 @@ class TeamspeakController(config: Config, userController: => UserController,
   val teamspeakPermissionMap: Seq[TeamspeakGroupMapEntry] =
     YamlParser.parseResource[TeamspeakGroupMap](Source.fromResource("teamspeak_group_map.yml")).teamspeak_group_map
 
-
   def obtainExpectedTeamspeakName(userId: Int): Future[String] = {
     userController.getUser(userId).map { u =>
       (u.eveUserData.allianceTicker match {
@@ -46,14 +45,14 @@ class TeamspeakController(config: Config, userController: => UserController,
     }
   }
 
-  def registerUserOnTeamspeak(userId: Int): Future[Unit] = {
+  def registerUserOnTeamspeak(userId: Int, userIp: String): Future[Unit] = {
 
     def registerJoinedUser(expectedNickname: String): Future[Unit] = {
       val f = safeTeamspeakQuery(() => client.getClients)()
         .map { r =>
           r.asScala.find(_.getNickname == expectedNickname) match {
-            case Some(user) => user.getUniqueIdentifier
-            case None => throw ResourceNotFoundException(s"No user with name $expectedNickname is on teamspeak")
+            case Some(user) if user.getIp == userIp => user.getUniqueIdentifier
+            case _ => throw ResourceNotFoundException(s"No user with name $expectedNickname is on teamspeak")
           }
         }
       f.onComplete {
@@ -78,7 +77,7 @@ class TeamspeakController(config: Config, userController: => UserController,
 
     def registerUsingEventListener(expectedNickname: String): Future[Unit] = {
       val p = Promise[String]()
-      safeAddListener(new RegistrationJoinListener(client, config, expectedNickname, p))(10.minutes)
+      safeAddListener(new RegistrationJoinListener(client, this, config, userIp, expectedNickname, p))(10.minutes)
         .onComplete {
           case Success(_) =>
             logger.info(s"Successfully registered listener for " +
@@ -164,13 +163,7 @@ class TeamspeakController(config: Config, userController: => UserController,
   }
 
   def getAllClients: Future[List[DatabaseClient]] = {
-    this.safeTeamspeakQuery(() => client.getDatabaseClients)().map(_.asScala.toList)
-  }
-
-  def getGroupsByUniqueId(uniqueId: String): Future[List[TeamspeakGroupMapEntry]] = {
-    this.safeTeamspeakQuery(() => client.getClientByUId(uniqueId))().map { resp =>
-      resp.getServerGroups.toList.flatMap(gId => teamspeakPermissionMap.find(_.teamspeak_group_id == gId))
-    }
+    this.safeTeamspeakQuery(() => client.getDatabaseClients)().map(_.asScala.toList.filterNot(_.getNickname.contains("ServerQuery")))
   }
 
   def syncTeamspeakUser(uniqueId: String, permissions: Seq[PermissionBitEntry]): Future[Unit] = {
@@ -180,7 +173,8 @@ class TeamspeakController(config: Config, userController: => UserController,
 
     val f = (for {
       tsDbId <- this.safeTeamspeakQuery(() => client.getDatabaseClientByUId(uniqueId))().map(_.getDatabaseId)
-      curGroups <- this.safeTeamspeakQuery(() => client.getClientByUId(uniqueId))().map(_.getServerGroups.toSet)
+      curGroups <- this.safeTeamspeakQuery(() => client.getServerGroupsByClientId(tsDbId))()
+        .map(_.asScala.map(_.getId).filterNot(_ == 8).toSet)
       addToGroups <- Future.sequence {
         (shouldBeGroups -- curGroups).toList.map { groupId =>
           this.safeTeamspeakQuery(() => client.addClientToServerGroup(groupId, tsDbId))().map(_.booleanValue())
@@ -207,6 +201,44 @@ class TeamspeakController(config: Config, userController: => UserController,
     }
   }
 
+  def getClientByUniqueId(uniqueId: String): Future[DatabaseClientInfo] = {
+    val f: Future[DatabaseClientInfo] = this.safeTeamspeakQuery(() => client.getDatabaseClientByUId(uniqueId))()
+      .map {
+      case null => throw ResourceNotFoundException(s"No teamspeak user with name uniqueId found")
+      case resp => resp
+    }
+    f.onComplete {
+      case Success(c) =>
+        logger.info(s"Got client " +
+          s"uniqueId8=${uniqueId.substring(8)} " +
+          s"teamspeakName=${c.getNickname} " +
+          s"teamspeakDbId=${c.getDatabaseId} " +
+          s"event=teamspeak.getByName.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to get client by uniqueId8=${uniqueId.substring(8)} event=teamspeak.getByName.failure", ex)
+    }
+    f
+  }
+
+  def getConnectedClientByUniqueId(uniqueId: String): Future[Client] = {
+    val f: Future[Client] = this.safeTeamspeakQuery(() => client.getClientByUId(uniqueId))()
+      .map {
+        case null => throw ResourceNotFoundException(s"No teamspeak user with name uniqueId found")
+        case resp => resp
+      }
+    f.onComplete {
+      case Success(c) =>
+        logger.info(s"Got client " +
+          s"uniqueId8=${uniqueId.substring(8)} " +
+          s"teamspeakName=${c.getNickname} " +
+          s"teamspeakDbId=${c.getDatabaseId} " +
+          s"event=teamspeak.getByName.success")
+      case Failure(ex) =>
+        logger.error(s"Failed to get client by uniqueId8=${uniqueId.substring(8)} event=teamspeak.getByName.failure", ex)
+    }
+    f
+  }
+
   def syncTeamspeakUser(userId: Int): Future[Unit] = {
     for {
       uniqueId <- this.getTeamspeakUniqueId(userId)
@@ -216,6 +248,7 @@ class TeamspeakController(config: Config, userController: => UserController,
   }
 
   private def safeQuery[T](f: () => T, timeout: FiniteDuration): Future[T] = {
+    // TODO: Fix java.lang.IllegalStateException: Promise already completed.
     val p = Promise[T]()
     val q = scheduler.scheduleWithFixedDelay(0.seconds, 5.seconds) {
       if (daemon.isConnected)

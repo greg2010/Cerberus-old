@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-class DaemonJob extends Job with LazyLogging {
+class UserDaemonJob extends Job with LazyLogging {
   override def execute(context: JobExecutionContext): Unit = {
     try {
       val dbAgent = context.getScheduler.getContext.get("dbAgent").asInstanceOf[JdbcBackend.Database]

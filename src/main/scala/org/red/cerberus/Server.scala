@@ -22,7 +22,10 @@ object Server extends App with LazyLogging with Base {
   lazy val userController: UserController = new UserController(permissionController, emailController, eveApiClient, teamspeakController)
 
   lazy val teamspeakController = new TeamspeakController(cerberusConfig, userController, permissionController)
-  lazy val scheduleController = new ScheduleController(cerberusConfig, userController)
+  lazy val scheduleController = new ScheduleController(cerberusConfig, userController, teamspeakController)
+
+  scheduleController.userDaemon
+  scheduleController.teamspeakDaemon
 
   val route: Route = this.baseRoute(authorizationController, userController, eveApiClient)
 

@@ -8,39 +8,65 @@ import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.impl.StdSchedulerFactory
 import org.quartz.{Scheduler, SimpleScheduleBuilder, TriggerKey}
-import org.red.cerberus.controllers.{ScheduleController, UserController}
-import org.red.cerberus.jobs.quartz.DaemonJob
+import org.red.cerberus.controllers.{ScheduleController, TeamspeakController, UserController}
+import org.red.cerberus.jobs.quartz.{TeamspeakDaemonJob, UserDaemonJob}
 import slick.jdbc.JdbcBackend
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 
-class ScheduleDaemon(scheduleController: => ScheduleController, config: Config, userController: => UserController)
+class ScheduleDaemon(scheduleController: => ScheduleController,
+                     config: Config,
+                     userController: => UserController,
+                     teamspeakController: => TeamspeakController)
                     (implicit dbAgent: JdbcBackend.Database, ec: ExecutionContext) extends LazyLogging {
   val quartzScheduler: Scheduler = new StdSchedulerFactory().getScheduler
-  private val daemonTriggerName = "userDaemon"
+  private val userDaemonTriggerName = "userDaemon"
+  private val teamspeakDaemonTriggerName = "teamspeakDaemon"
 
   quartzScheduler.getContext.put("dbAgent", dbAgent)
   quartzScheduler.getContext.put("ec", ec)
   quartzScheduler.getContext.put("scheduleController", scheduleController)
+  quartzScheduler.getContext.put("teamspeakController", teamspeakController)
   quartzScheduler.getContext.put("userController", userController)
   quartzScheduler.start()
-  val daemon: Cancelable =
+  val userDaemon: Cancelable =
     scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
-      val maybeTriggerKey = new TriggerKey(daemonTriggerName, config.getString("quartzUserUpdateGroupName"))
+      val maybeTriggerKey = new TriggerKey(userDaemonTriggerName, config.getString("quartzUserUpdateGroupName"))
       if (quartzScheduler.checkExists(maybeTriggerKey)) {
-        logger.info("Daemon has already started, doing nothing event=user.schedule")
+        logger.info("User daemon has already started, doing nothing event=user.schedule")
         quartzScheduler.getTrigger(maybeTriggerKey).getNextFireTime
       } else {
-        val j = newJob((new DaemonJob).getClass)
-          .withIdentity(daemonTriggerName, config.getString("quartzUserUpdateGroupName"))
+        val j = newJob((new UserDaemonJob).getClass)
+          .withIdentity(userDaemonTriggerName, config.getString("quartzUserUpdateGroupName"))
           .build()
         val t = newTrigger()
-          .withIdentity(daemonTriggerName, config.getString("quartzUserUpdateGroupName"))
+          .withIdentity(userDaemonTriggerName, config.getString("quartzUserUpdateGroupName"))
           .forJob(j)
           .withSchedule(SimpleScheduleBuilder
             .repeatMinutelyForever(config.getInt("quartzUserUpdateDaemonRefreshRate"))
+          )
+          .startNow()
+          .build()
+        quartzScheduler.scheduleJob(j, t)
+      }
+    }
+  val teamspeakDaemon: Cancelable =
+    scheduler.scheduleWithFixedDelay(0.seconds, 1.minute) {
+      val maybeTriggerKey = new TriggerKey(teamspeakDaemonTriggerName, config.getString("quartzTeamspeakGroupName"))
+      if (quartzScheduler.checkExists(maybeTriggerKey)) {
+        logger.info("Teamspeak daemon has already started, doing nothing event=teamspeak.schedule")
+        quartzScheduler.getTrigger(maybeTriggerKey).getNextFireTime
+      } else {
+        val j = newJob((new TeamspeakDaemonJob).getClass)
+          .withIdentity(teamspeakDaemonTriggerName, config.getString("quartzTeamspeakGroupName"))
+          .build()
+        val t = newTrigger()
+          .withIdentity(teamspeakDaemonTriggerName, config.getString("quartzTeamspeakGroupName"))
+          .forJob(j)
+          .withSchedule(SimpleScheduleBuilder
+            .repeatMinutelyForever(config.getInt("quartzTeamspeakUpdateDaemonRefreshRate"))
           )
           .startNow()
           .build()
