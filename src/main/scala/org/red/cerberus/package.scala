@@ -19,7 +19,6 @@ package object cerberus {
     implicit val system: ActorSystem = ActorSystem("cerberus", conf.getConfig("akka"))
     implicit val materializer: ActorMaterializer = ActorMaterializer()
     implicit val timeout: Timeout = Timeout(2 seconds)
-    implicit val dbAgent: JdbcBackend.Database = Database.forConfig("postgres", conf)
   }
 
 }

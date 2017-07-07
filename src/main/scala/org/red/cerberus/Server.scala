@@ -14,20 +14,8 @@ import scala.io.StdIn
 
 object Server extends App with LazyLogging with Base {
 
-  lazy val emailController: EmailController = new EmailController(cerberusConfig, userController)
 
-  lazy val eveApiClient: EveApiClient = new EveApiClient(cerberusConfig)
-  lazy val permissionController: PermissionController = new PermissionController(userController)
-  lazy val authorizationController: AuthorizationController = new AuthorizationController(permissionController)
-  lazy val userController: UserController = new UserController(permissionController, emailController, eveApiClient, teamspeakController)
-
-  lazy val teamspeakController = new TeamspeakController(cerberusConfig, userController, permissionController)
-  lazy val scheduleController = new ScheduleController(cerberusConfig, userController, teamspeakController)
-
-  scheduleController.userDaemon
-  scheduleController.teamspeakDaemon
-
-  val route: Route = this.baseRoute(authorizationController, userController, eveApiClient)
+  val route: Route = this.baseRoute(authorizationController, userController)
 
   val server = Http().bindAndHandle(route, cerberusConfig.getString("host"), cerberusConfig.getInt("port"))
   logger.debug(s"Server online at http://${cerberusConfig.getString("host")}:${cerberusConfig.getInt("port")}/\n" +

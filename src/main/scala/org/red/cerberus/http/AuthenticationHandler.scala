@@ -7,8 +7,8 @@ import io.circe.generic.auto._
 import io.circe.parser
 import io.circe.syntax._
 import org.red.cerberus.cerberusConfig
-import org.red.cerberus.exceptions.AuthenticationException
-import org.red.cerberus.util.{PrivateClaim, UserMini}
+import org.red.cerberus.util.PrivateClaim
+import org.red.iris.{AuthenticationException, UserMini}
 import pdi.jwt._
 
 import scala.concurrent.ExecutionContext.Implicits.global

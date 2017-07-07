@@ -5,13 +5,11 @@ import akka.http.scaladsl.server.{RejectionHandler, Route}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import org.red.cerberus.Implicits._
 import org.red.cerberus._
-import org.red.cerberus.controllers.{AuthorizationController, UserController}
-import org.red.cerberus.external.auth.EveApiClient
 import org.red.cerberus.http.{ApacheLog, AuthenticationHandler, Middleware}
-import org.red.cerberus.util.UserMini
-
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import org.red.cerberus.finagle.UserClient
+import org.red.iris.UserMini
 
 
 trait Base
@@ -23,7 +21,7 @@ trait Base
     with LazyLogging
     with FailFastCirceSupport {
 
-  def baseRoute(implicit authorizationController: AuthorizationController, userController: UserController, eveApiClient: EveApiClient): Route = {
+  def baseRoute(userClient: UserClient): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
     handleErrors {
@@ -31,10 +29,10 @@ trait Base
         handleErrors {
           accessLog(logger)(system.dispatcher, timeout, materializer) {
             pathPrefix(cerberusConfig.getString("basePath")) {
-              authEndpoints ~
+              authEndpoints(userClient) ~
                 authenticateOrRejectWithChallenge(authWithCustomJwt _) { userMini: UserMini =>
                   authorizeAsync(authorizationController.customAuthorization(userMini) _) {
-                    userEndpoints(userMini)
+                    userEndpoints(userClient)(userMini)
                   }
                 }
             }
