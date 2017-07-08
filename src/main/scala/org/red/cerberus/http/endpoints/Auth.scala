@@ -6,8 +6,8 @@ import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
-import org.red.cerberus.finagle.UserClient
 import org.red.cerberus.http._
+import org.red.iris.finagle.clients.UserClient
 import org.red.iris.{LegacyCredentials, SSOCredentials}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,8 +23,8 @@ trait Auth
         (get & parameters("key_id", "verification_code", "name".?)) { (keyId, verificationCode, name) =>
           complete {
             val credentials = LegacyCredentials(keyId.toInt, verificationCode, None, name)
-            /*eveApiClient.fetchUser(credentials)
-              .map(DataResponse.apply)*/
+            userClient.getEveUser(credentials)
+              .map(DataResponse.apply)
           }
         }
       }

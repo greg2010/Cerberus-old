@@ -4,9 +4,8 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.Implicits._
-import org.red.cerberus.controllers._
 import org.red.cerberus.http.endpoints.Base
-import org.red.cerberus.external.auth.EveApiClient
+import org.red.iris.finagle.clients.UserClient
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.io.StdIn
@@ -14,8 +13,9 @@ import scala.io.StdIn
 
 object Server extends App with LazyLogging with Base {
 
+  val userClient = new UserClient(cerberusConfig)
 
-  val route: Route = this.baseRoute(authorizationController, userController)
+  val route: Route = this.baseRoute(userClient)
 
   val server = Http().bindAndHandle(route, cerberusConfig.getString("host"), cerberusConfig.getInt("port"))
   logger.debug(s"Server online at http://${cerberusConfig.getString("host")}:${cerberusConfig.getInt("port")}/\n" +

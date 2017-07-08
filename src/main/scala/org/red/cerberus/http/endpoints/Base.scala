@@ -5,23 +5,26 @@ import akka.http.scaladsl.server.{RejectionHandler, Route}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import org.red.cerberus.Implicits._
 import org.red.cerberus._
-import org.red.cerberus.http.{ApacheLog, AuthenticationHandler, Middleware}
+import org.red.cerberus.http.{ApacheLog, AuthenticationHandler, AuthorizationHandler, Middleware}
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import org.red.cerberus.finagle.UserClient
 import org.red.iris.UserMini
+import org.red.iris.finagle.clients.UserClient
+
+import scala.concurrent.ExecutionContext
 
 
 trait Base
   extends ApacheLog
     with Middleware
     with AuthenticationHandler
+    with AuthorizationHandler
     with Auth
     with User
     with LazyLogging
     with FailFastCirceSupport {
 
-  def baseRoute(userClient: UserClient): Route = {
+  def baseRoute(userClient: UserClient)(implicit ec: ExecutionContext): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
     handleErrors {
@@ -31,7 +34,7 @@ trait Base
             pathPrefix(cerberusConfig.getString("basePath")) {
               authEndpoints(userClient) ~
                 authenticateOrRejectWithChallenge(authWithCustomJwt _) { userMini: UserMini =>
-                  authorizeAsync(authorizationController.customAuthorization(userMini) _) {
+                  authorizeAsync(customAuthorization(userMini) _) {
                     userEndpoints(userClient)(userMini)
                   }
                 }

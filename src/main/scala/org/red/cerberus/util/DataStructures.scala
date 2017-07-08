@@ -15,3 +15,7 @@ case class PrivateClaim(nme: String, id: Int, cid: Long) {
     )
   }
 }
+
+object PrivateClaim {
+  def apply(userMini: UserMini): PrivateClaim = PrivateClaim(userMini.name, userMini.id, userMini.characterId)
+}

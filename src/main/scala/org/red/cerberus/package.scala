@@ -4,8 +4,6 @@ import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
-import slick.jdbc.JdbcBackend
-import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.duration._
 import scala.language.postfixOps

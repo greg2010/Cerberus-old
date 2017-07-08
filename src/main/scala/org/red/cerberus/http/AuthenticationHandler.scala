@@ -70,11 +70,11 @@ trait AuthenticationHandler extends LazyLogging {
     JwtCirce.encode(header, payload, key)
   }
 
-  private def generatePayload(userData: UserMini, expiration: Long): JwtClaim = {
+  private def generatePayload(userMini: UserMini, expiration: Long): JwtClaim = {
     JwtClaim()
       .by(issuer)
       .to(audience)
-      .about(userData.toPrivateClaim.asJson.noSpaces)
+      .about(PrivateClaim(userMini).asJson.noSpaces)
       .withId(java.util.UUID.randomUUID().toString)
       .issuedNow
       .startsNow

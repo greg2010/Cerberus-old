@@ -1,17 +1,15 @@
-package org.red.cerberus.controllers
+package org.red.cerberus.http
 
 import akka.http.scaladsl.server.RequestContext
-import com.netaporter.uri.{PathPart, Uri}
+import com.netaporter.uri.Uri
 import com.typesafe.scalalogging.LazyLogging
-import io.circe.generic.auto._
-import org.red.cerberus.util.{PermissionBitEntry, UserMini, YamlParser}
+import org.red.cerberus.util.PermissionBitEntry
+import org.red.iris.UserMini
 
-import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
-import scala.io.Source
 
 
-class AuthorizationController(permissionController: => PermissionController)(implicit ec: ExecutionContext) extends LazyLogging {
+trait AuthorizationHandler extends LazyLogging {
 
   case class AccessMapEntry(route: String, kind: String, required_permissions: Seq[String])
 
@@ -21,6 +19,7 @@ class AuthorizationController(permissionController: => PermissionController)(imp
 
 
   def getPermissionsForUri(uri: Uri, method: String): Seq[PermissionBitEntry] = {
+    /*
     val filteredPermissionMap = permissionMap.filter { entry => entry.method.isEmpty || entry.method.get == method }
 
     @tailrec
@@ -59,11 +58,13 @@ class AuthorizationController(permissionController: => PermissionController)(imp
             .required_permissions
             .map(permissionController.findPermissionByName)
       )
-    }
+      */
+    Seq[PermissionBitEntry]()
+  }
 
 
   // TODO: reimplement
-  def customAuthorization(userData: UserMini)(ctx: RequestContext): Future[Boolean] = {
+  def customAuthorization(userData: UserMini)(ctx: RequestContext)(implicit ec: ExecutionContext): Future[Boolean] = {
     Future { true } /*
       val routeBinPermission =
         permissionController.getBinPermissions(
