@@ -13,7 +13,7 @@ import scala.io.StdIn
 
 object Server extends App with LazyLogging with Base {
 
-  val userClient = new UserClient(cerberusConfig)
+  val userClient = new UserClient(config)
 
   val route: Route = this.baseRoute(userClient)
 
