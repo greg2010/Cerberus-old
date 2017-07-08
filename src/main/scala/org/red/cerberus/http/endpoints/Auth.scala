@@ -3,6 +3,7 @@ package org.red.cerberus.http.endpoints
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import org.red.cerberus.util.converters._
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
@@ -24,7 +25,7 @@ trait Auth
           complete {
             val credentials = LegacyCredentials(keyId.toInt, verificationCode, None, name)
             userClient.getEveUser(credentials)
-              .map(DataResponse.apply)
+              .map(nonEmptyList => DataResponse.apply(nonEmptyList.toSeq.map(_.toResponse)))
           }
         }
       }
@@ -59,6 +60,7 @@ trait Auth
           (get & parameters("code", "state")) { (code, state) =>
             complete {
               StatusCodes.OK
+              // TODO: figure out what to do with this endpoint
               /*eveApiClient.fetchCredentials(SSOAuthCode(code))
                 .flatMap { res =>
                   userController.createUser("", None, res)
