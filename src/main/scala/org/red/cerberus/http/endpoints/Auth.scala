@@ -15,10 +15,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 trait Auth
-  extends AuthenticationHandler
-    with LazyLogging
+  extends LazyLogging
     with FailFastCirceSupport {
-  def authEndpoints(userClient: UserClient): Route = pathPrefix("auth") {
+  def authEndpoints(userClient: UserClient, authenticationHandler: AuthenticationHandler): Route = pathPrefix("auth") {
     pathPrefix("api") {
       pathPrefix("legacy") {
         (get & parameters("key_id", "verification_code", "name".?)) { (keyId, verificationCode, name) =>
@@ -34,16 +33,19 @@ trait Auth
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
           complete {
-            userClient.verifyUserLegacy(nameOrEmail, password).flatMap { userMini =>
-              Future {
+            for {
+              userMini <- userClient.verifyUserLegacy(nameOrEmail, password)
+              accessToken <- authenticationHandler.generateAccessJwt(userMini)
+              refreshToken <- authenticationHandler.generateRefreshJwt(userMini)
+              res <- Future {
                 DataResponse(
                   TokenResponse(
-                    access_token = generateAccessJwt(userMini),
-                    refresh_token = generateRefreshJwt(userMini)
+                    access_token = accessToken,
+                    refresh_token = refreshToken
                   )
                 )
               }
-            }
+            } yield res
           }
         } ~
           (post & entity(as[LegacySignupReq])) { req =>
@@ -85,7 +87,7 @@ trait Auth
         pathPrefix("refresh") {
           (get & parameter("refresh_token")) { refreshToken =>
             complete {
-              DataResponse(generateAccessJwt(extractPayloadFromToken(refreshToken)))
+              authenticationHandler.extractPayloadFromToken(refreshToken).flatMap(authenticationHandler.generateAccessJwt).map(DataResponse.apply)
             }
           }
         } ~

@@ -17,14 +17,13 @@ import scala.concurrent.ExecutionContext
 trait Base
   extends ApacheLog
     with Middleware
-    with AuthenticationHandler
     with AuthorizationHandler
     with Auth
     with User
     with LazyLogging
     with FailFastCirceSupport {
 
-  def baseRoute(userClient: UserClient)(implicit ec: ExecutionContext): Route = {
+  def baseRoute(userClient: UserClient, authenticationHandler: AuthenticationHandler)(implicit ec: ExecutionContext): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
     handleErrors {
@@ -32,9 +31,9 @@ trait Base
         handleErrors {
           accessLog(logger)(system.dispatcher, timeout, materializer) {
             pathPrefix(cerberusConfig.getString("basePath")) {
-              authEndpoints(userClient) ~
-                authenticateOrRejectWithChallenge(authWithCustomJwt _) { userMini: UserMini =>
-                  authorizeAsync(customAuthorization(userMini) _) {
+              authEndpoints(userClient, authenticationHandler) ~
+                authenticateOrRejectWithChallenge(authenticationHandler.authWithCustomJwt _) { userMini: UserMini =>
+                  authorize(customAuthorization(userMini) _) {
                     userEndpoints(userClient)(userMini)
                   }
                 }

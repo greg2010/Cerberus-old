@@ -43,7 +43,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
   "io.lemonlabs" %% "scala-uri" % "0.4.16",
-  "org.red" %% "iris" % "0.0.4-SNAPSHOT",
+  "org.red" %% "iris" % "0.0.6-SNAPSHOT",
   "io.circe" %% "circe-core" % circeVersion,
   "io.circe" %% "circe-generic" % circeVersion,
   "io.circe" %% "circe-parser" % circeVersion)

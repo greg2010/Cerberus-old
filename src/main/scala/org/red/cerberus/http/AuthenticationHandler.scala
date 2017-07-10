@@ -8,52 +8,51 @@ import io.circe.parser
 import io.circe.syntax._
 import org.red.cerberus.cerberusConfig
 import org.red.cerberus.util.PrivateClaim
+import org.red.iris.finagle.clients.PermissionClient
 import org.red.iris.{AuthenticationException, UserMini}
 import pdi.jwt._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 
-trait AuthenticationHandler extends LazyLogging {
+class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: ExecutionContext) extends LazyLogging {
 
 
-  protected def authWithCustomJwt(credentials: Option[HttpCredentials]):
+  def authWithCustomJwt(credentials: Option[HttpCredentials]):
   Future[AuthenticationResult[UserMini]] =
-    Future {
-      credentials match {
-        case Some(creds) =>
-          try {
-            Right(extractPayload(decodeJwt(creds.token)))
-          }
-          catch {
-            case ex: Exception if NonFatal(ex) =>
-              logger.error("Failed to decode JWT", ex)
-              Left(challenge)
-          }
-        case _ =>
-          logger.error("Missing auth credentials")
-          Left(challenge)
-      }
+    credentials match {
+      case Some(creds) =>
+        try {
+          extractPayload(decodeJwt(creds.token)).map(Right.apply)
+        }
+        catch {
+          case ex: Exception if NonFatal(ex) =>
+            logger.error("Failed to decode JWT", ex)
+            Future(Left(challenge))
+        }
+      case _ =>
+        logger.error("Missing auth credentials")
+        Future(Left(challenge))
     }
 
-  protected def generateAccessJwt(userData: UserMini): String = {
+
+  def generateAccessJwt(userData: UserMini): Future[String] = {
     logger.info(s"generating access token for userId=${userData.id}")
-    encodeJwt(generatePayload(userData, accessExpiration))
+    generatePayload(userData, accessExpiration).map(encodeJwt)
   }
 
-  protected def generateRefreshJwt(userData: UserMini): String = {
+  def generateRefreshJwt(userData: UserMini): Future[String] = {
     logger.info(s"generating refresh token for userId=${userData.id}")
-    encodeJwt(generatePayload(userData, refreshExpiration))
+    generatePayload(userData, refreshExpiration).map(encodeJwt)
   }
 
   protected def validateJwt(token: String): Boolean = {
     JwtCirce.isValid(token, key, Seq(algorithm))
   }
 
-  protected def extractPayloadFromToken(token: String): UserMini = {
+  def extractPayloadFromToken(token: String): Future[UserMini] = {
     extractPayload(decodeJwt(token))
   }
 
@@ -70,15 +69,17 @@ trait AuthenticationHandler extends LazyLogging {
     JwtCirce.encode(header, payload, key)
   }
 
-  private def generatePayload(userMini: UserMini, expiration: Long): JwtClaim = {
-    JwtClaim()
-      .by(issuer)
-      .to(audience)
-      .about(PrivateClaim(userMini).asJson.noSpaces)
-      .withId(java.util.UUID.randomUUID().toString)
-      .issuedNow
-      .startsNow
-      .expiresIn(expiration)
+  private def generatePayload(userMini: UserMini, expiration: Long): Future[JwtClaim] = {
+    PrivateClaim.fromUserData(userMini, permissionClient).map { data =>
+      JwtClaim()
+        .by(issuer)
+        .to(audience)
+        .about(data.asJson.noSpaces)
+        .withId(java.util.UUID.randomUUID().toString)
+        .issuedNow
+        .startsNow
+        .expiresIn(expiration)
+    }
   }
 
   private def decodeJwt(token: String): JwtClaim = {
@@ -90,18 +91,18 @@ trait AuthenticationHandler extends LazyLogging {
     }
   }
 
-  private def extractPayload(jwtClaim: JwtClaim): UserMini = {
+  private def extractPayload(jwtClaim: JwtClaim): Future[UserMini] = {
     jwtClaim.subject match {
       case Some(sub) =>
         parser.decode[PrivateClaim](sub) match {
-          case Right(privateClaim) => privateClaim.toUserData
+          case Right(privateClaim) => privateClaim.toUserData(permissionClient)
           case Left(ex) =>
             logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
-            throw ex
+            Future.failed(ex)
         }
       case None =>
         logger.error("Empty JWT payload")
-        throw AuthenticationException("Empty JWT payload", "")
+        Future.failed(AuthenticationException("Empty JWT payload", ""))
     }
   }
 }
