@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.red.iris.{AccessRestrictedException, AuthenticationException, BadEveCredential, ConflictingEntityException}
+import org.red.iris._
 
 import scala.language.implicitConversions
 
@@ -18,6 +18,9 @@ trait Middleware extends LazyLogging with FailFastCirceSupport {
 
   implicit def exceptionHandler: ExceptionHandler = {
     ExceptionHandler {
+      case exc@ResourceNotFoundException(reason) =>
+        logger.warn(s"Got resourceNotFoundException with reason $reason")
+        complete(StatusCodes.NotFound)
       case exc@AuthenticationException(cause, sub) =>
         logger.warn(s"Failed to Authenticate user, offending sub=$sub")
         complete(HttpResponse(StatusCodes.Unauthorized, entity = ErrorResponse(s"Authentication failed, $cause")))

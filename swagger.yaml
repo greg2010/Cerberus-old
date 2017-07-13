@@ -248,6 +248,14 @@ paths:
       responses:
         200:
           description: Successful response
+  /user/self/teamspeak:
+    put:
+      operationId: "ts_register"
+      summary: |
+        Registers on teamspeak
+      responses:
+        202:
+          description: Request accepted
   /user/self/password:
     put:
       operationId: "password_change"
