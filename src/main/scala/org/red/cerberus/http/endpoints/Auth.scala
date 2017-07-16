@@ -35,13 +35,11 @@ trait Auth
           complete {
             for {
               userMini <- userClient.verifyUserLegacy(nameOrEmail, password)
-              accessToken <- authenticationHandler.generateAccessJwt(userMini)
-              refreshToken <- authenticationHandler.generateRefreshJwt(userMini)
               res <- Future {
                 DataResponse(
                   TokenResponse(
-                    access_token = accessToken,
-                    refresh_token = refreshToken
+                    access_token = authenticationHandler.generateAccessJwt(userMini),
+                    refresh_token = authenticationHandler.generateRefreshJwt(userMini)
                   )
                 )
               }
@@ -87,7 +85,7 @@ trait Auth
         pathPrefix("refresh") {
           (get & parameter("refresh_token")) { refreshToken =>
             complete {
-              authenticationHandler.extractPayloadFromToken(refreshToken).flatMap(authenticationHandler.generateAccessJwt).map(DataResponse.apply)
+              authenticationHandler.extractPayloadFromToken(refreshToken).map(authenticationHandler.generateAccessJwt).map(DataResponse.apply)
             }
           }
         } ~

@@ -9,7 +9,7 @@ import io.circe.syntax._
 import org.red.cerberus.cerberusConfig
 import org.red.cerberus.util.PrivateClaim
 import org.red.iris.finagle.clients.PermissionClient
-import org.red.iris.{AuthenticationException, UserMini}
+import org.red.iris.{AuthenticationException, PermissionBit, UserMini}
 import pdi.jwt._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,7 +17,7 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 
-class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: ExecutionContext) extends LazyLogging {
+class AuthenticationHandler(permissionList: Future[Seq[PermissionBit]])(implicit ec: ExecutionContext) extends LazyLogging {
 
 
   def authWithCustomJwt(credentials: Option[HttpCredentials]):
@@ -38,14 +38,14 @@ class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: Exe
     }
 
 
-  def generateAccessJwt(userData: UserMini): Future[String] = {
+  def generateAccessJwt(userData: UserMini): String = {
     logger.info(s"generating access token for userId=${userData.id}")
-    generatePayload(userData, accessExpiration).map(encodeJwt)
+    encodeJwt(generatePayload(userData, accessExpiration))
   }
 
-  def generateRefreshJwt(userData: UserMini): Future[String] = {
+  def generateRefreshJwt(userData: UserMini): String = {
     logger.info(s"generating refresh token for userId=${userData.id}")
-    generatePayload(userData, refreshExpiration).map(encodeJwt)
+    encodeJwt(generatePayload(userData, refreshExpiration))
   }
 
   protected def validateJwt(token: String): Boolean = {
@@ -69,17 +69,15 @@ class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: Exe
     JwtCirce.encode(header, payload, key)
   }
 
-  private def generatePayload(userMini: UserMini, expiration: Long): Future[JwtClaim] = {
-    PrivateClaim.fromUserData(userMini, permissionClient).map { data =>
-      JwtClaim()
-        .by(issuer)
-        .to(audience)
-        .about(data.asJson.noSpaces)
-        .withId(java.util.UUID.randomUUID().toString)
-        .issuedNow
-        .startsNow
-        .expiresIn(expiration)
-    }
+  private def generatePayload(userMini: UserMini, expiration: Long): JwtClaim = {
+    JwtClaim()
+      .by(issuer)
+      .to(audience)
+      .about(PrivateClaim.fromUserData(userMini).asJson.noSpaces)
+      .withId(java.util.UUID.randomUUID().toString)
+      .issuedNow
+      .startsNow
+      .expiresIn(expiration)
   }
 
   private def decodeJwt(token: String): JwtClaim = {
@@ -95,7 +93,7 @@ class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: Exe
     jwtClaim.subject match {
       case Some(sub) =>
         parser.decode[PrivateClaim](sub) match {
-          case Right(privateClaim) => privateClaim.toUserData(permissionClient)
+          case Right(privateClaim) => permissionList.map(privateClaim.toUserData)
           case Left(ex) =>
             logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
             Future.failed(ex)

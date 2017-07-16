@@ -19,7 +19,9 @@ object Server extends App with LazyLogging with Base {
   val permissionClient = new PermissionClient(config)
   val teamspeakClient = new TeamspeakClient(config)
 
-  val authenticationHandler = new AuthenticationHandler(permissionClient)
+  lazy val permissionList = permissionClient.getPermissionList
+
+  val authenticationHandler = new AuthenticationHandler(permissionList)
 
   val route = this.baseRoute(userClient, teamspeakClient, authenticationHandler) _
   val server = Http().bind(cerberusConfig.getString("host"), cerberusConfig.getInt("port"))

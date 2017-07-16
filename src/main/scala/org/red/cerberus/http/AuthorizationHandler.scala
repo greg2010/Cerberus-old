@@ -3,7 +3,6 @@ package org.red.cerberus.http
 import akka.http.scaladsl.server.RequestContext
 import com.netaporter.uri.{PathPart, StringPathPart, Uri}
 import com.typesafe.scalalogging.LazyLogging
-import org.red.cerberus.util.PermissionBitEntry
 import org.red.iris.util.YamlParser
 import org.red.iris.{PermissionBit, UserMini}
 import io.circe.generic.auto._
