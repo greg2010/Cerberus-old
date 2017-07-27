@@ -40,6 +40,7 @@ libraryDependencies ++= Seq(
   "de.heikoseeberger" %% "akka-http-circe" % "1.16.0",
   "com.typesafe" % "config" % "1.3.1",
   "ch.qos.logback" % "logback-classic" % "1.1.7",
+  "com.github.pukkaone" % "logback-gelf" % "1.1.10",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.5.0",
   "com.pauldijou" %% "jwt-circe" % "0.12.1",
   "io.lemonlabs" %% "scala-uri" % "0.4.16",
