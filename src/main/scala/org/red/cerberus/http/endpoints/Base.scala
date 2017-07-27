@@ -2,6 +2,7 @@ package org.red.cerberus.http.endpoints
 
 import java.net.InetSocketAddress
 
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RejectionHandler, Route}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
@@ -33,6 +34,9 @@ trait Base
         handleErrors {
           accessLog(logger)(system.dispatcher, timeout, materializer) {
             pathPrefix(cerberusConfig.getString("basePath")) {
+              get {
+                complete {HttpResponse(StatusCodes.OK)}
+              } ~
               authEndpoints(userClient, authenticationHandler) ~
                 authenticateOrRejectWithChallenge(authenticationHandler.authWithCustomJwt _) { userMini: UserMini =>
                   authorize(customAuthorization(userMini) _) {

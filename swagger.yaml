@@ -44,6 +44,11 @@ definitions:
 
 
 paths:
+  /:
+  get:
+    operationId: "root"
+    summary: |
+      returns OK if the API server is ready
   /auth/api/legacy:
     get:
       operationId: "api_legacy"
