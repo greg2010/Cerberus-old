@@ -34,8 +34,10 @@ trait Base
         cors() {
           handleErrors {
             pathPrefix(cerberusConfig.getString("basePath")) {
-              get {
-                complete {HttpResponse(StatusCodes.OK)}
+              pathEndOrSingleSlash {
+                get {
+                  complete {HttpResponse(StatusCodes.OK, entity = "OK")}
+                }
               } ~
               authEndpoints(userClient, authenticationHandler) ~
                 authenticateOrRejectWithChallenge(authenticationHandler.authWithCustomJwt _) { userMini: UserMini =>
