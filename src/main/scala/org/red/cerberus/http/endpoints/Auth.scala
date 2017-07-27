@@ -3,31 +3,28 @@ package org.red.cerberus.http.endpoints
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
+import org.red.cerberus.util.converters._
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
-import moe.pizza.eveapi.ApiKey
-import org.red.cerberus._
-import org.red.cerberus.controllers.UserController
-import org.red.cerberus.external.auth.EveApiClient
 import org.red.cerberus.http._
-import org.red.cerberus.util.{LegacyCredentials, SSOAuthCode}
+import org.red.iris.finagle.clients.UserClient
+import org.red.iris.{LegacyCredentials, SSOCredentials}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 trait Auth
-  extends AuthenticationHandler
-    with LazyLogging
+  extends LazyLogging
     with FailFastCirceSupport {
-  def authEndpoints(implicit userController: UserController, eveApiClient: EveApiClient): Route = pathPrefix("auth") {
+  def authEndpoints(userClient: UserClient, authenticationHandler: AuthenticationHandler): Route = pathPrefix("auth") {
     pathPrefix("api") {
       pathPrefix("legacy") {
         (get & parameters("key_id", "verification_code", "name".?)) { (keyId, verificationCode, name) =>
           complete {
-            val credentials = LegacyCredentials(ApiKey(keyId.toInt, verificationCode), name)
-            eveApiClient.fetchUser(credentials)
-              .map(DataResponse.apply)
+            val credentials = LegacyCredentials(keyId.toInt, verificationCode, None, name)
+            userClient.getEveUser(credentials)
+              .map(nonEmptyList => DataResponse.apply(nonEmptyList.toSeq.map(_.toResponse)))
           }
         }
       }
@@ -36,25 +33,24 @@ trait Auth
       pathPrefix("legacy") {
         (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
           complete {
-            userController.verifyUser(nameOrEmail, password).flatMap { userMini =>
-              Future {
+            for {
+              userMini <- userClient.verifyUserLegacy(nameOrEmail, password)
+              res <- Future {
                 DataResponse(
                   TokenResponse(
-                    access_token = generateAccessJwt(userMini),
-                    refresh_token = generateRefreshJwt(userMini)
+                    access_token = authenticationHandler.generateAccessJwt(userMini),
+                    refresh_token = authenticationHandler.generateRefreshJwt(userMini)
                   )
                 )
               }
-            }
+            } yield res
           }
         } ~
           (post & entity(as[LegacySignupReq])) { req =>
             complete {
-              userController.createUser(req.email, Some(req.password),
-                LegacyCredentials(
-                  ApiKey(req.key_id.toInt, req.verification_code),
-                  Some(req.name))
-              ).map { _ =>
+              userClient.createLegacyUser(req.email,
+                LegacyCredentials(req.key_id.toInt, req.verification_code, None, Some(req.name)), req.password)
+                .map { _ =>
                 HttpResponse(StatusCodes.Created)
               }
             }
@@ -63,10 +59,12 @@ trait Auth
         pathPrefix("sso") {
           (get & parameters("code", "state")) { (code, state) =>
             complete {
-              eveApiClient.fetchCredentials(SSOAuthCode(code))
+              StatusCodes.OK
+              // TODO: figure out what to do with this endpoint
+              /*eveApiClient.fetchCredentials(SSOAuthCode(code))
                 .flatMap { res =>
                   userController.createUser("", None, res)
-                }
+                }*/
             }
           } ~
             (get & parameter("token")) { token =>
@@ -77,9 +75,8 @@ trait Auth
             (post & parameters("refresh_token", "email", "password".?)) {
               (refreshToken, email, password) =>
                 complete {
-                  eveApiClient.fetchCredentials(refreshToken).flatMap { creds =>
-                    userController.createUser(email, password, creds)
-                  }.map { _ =>
+                  userClient.createSSOUser(email, SSOCredentials(refreshToken, None), password)
+                  .map { _ =>
                     HttpResponse(StatusCodes.Created)
                   }
                 }
@@ -88,21 +85,21 @@ trait Auth
         pathPrefix("refresh") {
           (get & parameter("refresh_token")) { refreshToken =>
             complete {
-              DataResponse(generateAccessJwt(extractPayloadFromToken(refreshToken)))
+              authenticationHandler.extractPayloadFromToken(refreshToken).map(authenticationHandler.generateAccessJwt).map(DataResponse.apply)
             }
           }
         } ~
         pathPrefix("password") {
           (post & entity(as[passwordResetRequestReq])) { passwordResetRequest =>
             complete {
-              userController.requestPasswordReset(passwordResetRequest.email)
+              userClient.requestPasswordReset(passwordResetRequest.email)
                 // https://stackoverflow.com/a/33389526
                 .map(_ => HttpResponse(StatusCodes.Accepted))
             }
           } ~
             (put & entity(as[passwordChangeWithTokenReq])) { passwordChangeRequest =>
               complete {
-                userController.completePasswordReset(
+                userClient.completePasswordReset(
                   passwordChangeRequest.email,
                   passwordChangeRequest.token,
                   passwordChangeRequest.new_password)

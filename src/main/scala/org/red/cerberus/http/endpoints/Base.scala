@@ -1,40 +1,48 @@
 package org.red.cerberus.http.endpoints
 
+import java.net.InetSocketAddress
+
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RejectionHandler, Route}
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import org.red.cerberus.Implicits._
 import org.red.cerberus._
-import org.red.cerberus.controllers.{AuthorizationController, UserController}
-import org.red.cerberus.external.auth.EveApiClient
-import org.red.cerberus.http.{ApacheLog, AuthenticationHandler, Middleware}
-import org.red.cerberus.util.UserMini
-
+import org.red.cerberus.http.{ApacheLog, AuthenticationHandler, AuthorizationHandler, Middleware}
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import org.red.iris.UserMini
+import org.red.iris.finagle.clients.{TeamspeakClient, UserClient}
+
+import scala.concurrent.ExecutionContext
 
 
 trait Base
   extends ApacheLog
     with Middleware
-    with AuthenticationHandler
+    with AuthorizationHandler
     with Auth
     with User
     with LazyLogging
     with FailFastCirceSupport {
 
-  def baseRoute(implicit authorizationController: AuthorizationController, userController: UserController, eveApiClient: EveApiClient): Route = {
+  def baseRoute(userClient: UserClient, teamspeakClient: TeamspeakClient, authenticationHandler: AuthenticationHandler)(address: InetSocketAddress)(implicit ec: ExecutionContext): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
-    handleErrors {
-      cors() {
-        handleErrors {
-          accessLog(logger)(system.dispatcher, timeout, materializer) {
+    accessLog(logger)(system.dispatcher, timeout, materializer) {
+      handleErrors {
+        cors() {
+          handleErrors {
             pathPrefix(cerberusConfig.getString("basePath")) {
-              authEndpoints ~
-                authenticateOrRejectWithChallenge(authWithCustomJwt _) { userMini: UserMini =>
-                  authorizeAsync(authorizationController.customAuthorization(userMini) _) {
-                    userEndpoints(userMini)
+              pathEndOrSingleSlash {
+                get {
+                  complete {HttpResponse(StatusCodes.OK, entity = "OK")}
+                }
+              } ~
+              authEndpoints(userClient, authenticationHandler) ~
+                authenticateOrRejectWithChallenge(authenticationHandler.authWithCustomJwt _) { userMini: UserMini =>
+                  authorize(customAuthorization(userMini) _) {
+                    userEndpoints(userClient, teamspeakClient)(userMini, address)
                   }
                 }
             }
