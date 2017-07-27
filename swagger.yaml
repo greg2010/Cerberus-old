@@ -45,10 +45,14 @@ definitions:
 
 paths:
   /:
-  get:
-    operationId: "root"
-    summary: |
-      returns OK if the API server is ready
+    get:
+      operationId: "root"
+      summary: |
+        returns OK if the API server is ready
+      responses:
+        200:
+          description: Successful response
+          schema: { }
   /auth/api/legacy:
     get:
       operationId: "api_legacy"
