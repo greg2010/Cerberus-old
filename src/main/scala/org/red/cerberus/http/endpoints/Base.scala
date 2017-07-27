@@ -29,10 +29,10 @@ trait Base
   def baseRoute(userClient: UserClient, teamspeakClient: TeamspeakClient, authenticationHandler: AuthenticationHandler)(address: InetSocketAddress)(implicit ec: ExecutionContext): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
-    handleErrors {
-      cors() {
-        handleErrors {
-          accessLog(logger)(system.dispatcher, timeout, materializer) {
+    accessLog(logger)(system.dispatcher, timeout, materializer) {
+      handleErrors {
+        cors() {
+          handleErrors {
             pathPrefix(cerberusConfig.getString("basePath")) {
               get {
                 complete {HttpResponse(StatusCodes.OK)}
