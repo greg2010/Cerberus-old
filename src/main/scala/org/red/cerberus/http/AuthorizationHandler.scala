@@ -65,7 +65,7 @@ trait AuthorizationHandler extends LazyLogging {
   def customAuthorization(userData: UserMini)(ctx: RequestContext)(implicit ec: ExecutionContext): Boolean = {
     val routePermissions = getPermissionsForUri(Uri.parse(ctx.unmatchedPath.toString), ctx.request.method.value)
     logger.info(s"Calculated path=${ctx.unmatchedPath.toString} permissions " +
-      s"pathPermission=$routePermissions userPermission=${userData.userPermissions}")
-    routePermissions.toSet.subsetOf(userData.userPermissions.map(_.name).toSet)
+      s"pathPermission=$routePermissions userPermission=${userData.permissions}")
+    routePermissions.toSet.subsetOf(userData.permissions.map(_.name).toSet)
   }
 }

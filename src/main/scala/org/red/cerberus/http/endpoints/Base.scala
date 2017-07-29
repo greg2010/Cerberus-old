@@ -22,6 +22,7 @@ trait Base
     with Middleware
     with AuthorizationHandler
     with Auth
+    with Token
     with User
     with LazyLogging
     with FailFastCirceSupport {
@@ -34,11 +35,7 @@ trait Base
         cors() {
           handleErrors {
             pathPrefix(cerberusConfig.getString("basePath")) {
-              pathEndOrSingleSlash {
-                get {
-                  complete {HttpResponse(StatusCodes.OK, entity = "OK")}
-                }
-              } ~
+              tokenEndpoints(userClient, authenticationHandler) ~
               authEndpoints(userClient, authenticationHandler) ~
                 authenticateOrRejectWithChallenge(authenticationHandler.authWithCustomJwt _) { userMini: UserMini =>
                   authorize(customAuthorization(userMini) _) {

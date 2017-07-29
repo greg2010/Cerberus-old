@@ -1,7 +1,7 @@
 swagger: '2.0'
 
 info:
-  version: "0.0.1"
+  version: "0.0.2"
   title: RED Coalition Resources Auth
 
 host: api.red.greg2010.me
@@ -13,6 +13,13 @@ produces:
 - application/json
 
 definitions:
+  TokenResponse:
+    type: object
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
   EveCharacterInfo:
     type: object
     required:
@@ -44,29 +51,20 @@ definitions:
 
 
 paths:
-  /:
-    get:
-      operationId: "root"
-      summary: |
-        returns OK if the API server is ready
-      responses:
-        200:
-          description: Successful response
-          schema: { }
   /auth/api/legacy:
     get:
-      operationId: "api_legacy"
+      operationId: "apiLegacy"
       summary: |
         Gets user credentials from an API key
       parameters:
         -
-          name: key_id
+          name: keyId
           in: query
           description: API key id
           required: true
           type: integer
         -
-          name: verification_code
+          name: verificationCode
           in: query
           description: API vCode
           required: true
@@ -88,112 +86,34 @@ paths:
                 type: array
                 items:
                   $ref: "#/definitions/EveCharacterInfo"
-  /auth/login/legacy:
-    get:
-      operationId: "login_legacy"
-      summary: |
-        Verifies user credentials using login/email and password and issues new access/refresh tokens
-      parameters:
-        -
-          name: name_or_email
-          in: query
-          description: URL-encoded name or email of user
-          required: false
-          type: string
-        -
-          name: password
-          in: query
-          description: Password of user
-          required: true
-          type: string
-      responses:
-        200:
-          description: Successful response
-          schema:
-            title: credentials
-            type: object
-            properties:
-              refresh_token:
-                type: string
-              access_token:
-                type: string
+  /auth/login/:
     post:
-      operationId: "signup_legacy"
+      operationId: "signInSSO"
       summary: |
-        Creates account for user using legacy XML API
+        Logs user into account using SSO
       parameters:
-      - name: user_data
+      - name: body
         in: body
-        description: User object with legacy API
+        description: Auth code provided by CCP SSO
         required: true
         schema:
           type: object
           properties:
-            key_id:
+            authCode:
               type: string
-            verification_code:
-              type: string
-            name:
-              type: string
-            email:
-              type: string
-            password:
-              type: string
-      responses:
-        201:
-          description: User created successfully
-  /auth/login/sso:
-    get:
-      operationId: "login_SSO"
-      summary: |
-        Verifies user credentials using bearer token obtained during SSO and issues new access/refresh tokens
-      parameters:
-        -
-          name: token
-          in: query
-          description: Bearer token
-          required: true
-          type: string
       responses:
         200:
-          description: Successful response
+          description: OK
           schema:
-            title: credentials
-            type: object
-            properties:
-              refresh_token:
-                type: string
-              access_token:
-                type: string
-    post:
-      operationId: "signup_SSO"
-      summary: |
-        Creates account for user using SSO
-      parameters:
-      - name: user_data
-        in: body
-        description: User object with SSO refresh token
-        required: true
-        schema:
-          type: object
-          properties:
-            refresh_token:
-              type: string
-            email:
-              type: string
-            password:
-              type: string
-      responses:
-        201:
-          description: User created successfully
-  /auth/login/refresh:
+            $ref: "#/definitions/TokenResponse"
+  /token/refresh:
     get:
-      operationId: "refresh_auth_token"
+      operationId: "refreshAuthToken"
       summary: |
         Uses user's refresh token to issue new access token
       parameters:
         -
-          name: refresh_token
+          name: refreshToken
           in: query
           description: Refresh token
           required: true
@@ -205,47 +125,47 @@ paths:
             title: credentials
             type: object
             properties:
-              refresh_token:
+              accessToken:
                 type: string
-  /auth/password:
-    post:
-      operationId: "request_password_reset"
-      summary: |
-        Requests password reset for user by email
-      parameters:
-      - name: user_data
-        in: body
-        description: Object with user's email
-        required: true
-        schema:
-          type: object
-          properties:
-            email:
-              type: string
-      responses:
-        202:
-          description: Request accepted
-    put:
-      operationId: "password_change_with_token"
-      summary: |
-        Resets user password using token for authorization
-      parameters:
-      - name: user_data
-        in: body
-        description: Object with user's new password email and token
-        required: true
-        schema:
-          type: object
-          properties:
-            email:
-              type: string
-            token:
-              type: string
-            new_password:
-              type: string
-      responses:
-        204:
-          description: Password succesffuly reset
+#  /auth/password:
+#    post:
+#      operationId: "request_password_reset"
+#      summary: |
+#        Requests password reset for user by email
+#      parameters:
+#      - name: user_data
+#        in: body
+#        description: Object with user's email
+#        required: true
+#        schema:
+#          type: object
+#          properties:
+#            email:
+#              type: string
+#      responses:
+#        202:
+#          description: Request accepted
+#    put:
+#      operationId: "password_change_with_token"
+#      summary: |
+#        Resets user password using token for authorization
+#      parameters:
+#      - name: user_data
+#        in: body
+#        description: Object with user's new password email and token
+#        required: true
+#        schema:
+#          type: object
+#          properties:
+#            email:
+#              type: string
+#            token:
+#              type: string
+#            new_password:
+#              type: string
+#      responses:
+#        204:
+#          description: Password succesffuly reset
   /user/self/logout:
     post:
       operationId: "logout"
@@ -259,7 +179,7 @@ paths:
           description: Successful response
   /user/self/teamspeak:
     put:
-      operationId: "ts_register"
+      operationId: "tsRegister"
       summary: |
         Registers on teamspeak
       responses:
@@ -267,11 +187,11 @@ paths:
           description: Request accepted
   /user/self/password:
     put:
-      operationId: "password_change"
+      operationId: "passwordChange"
       summary: |
         Resets user password
       parameters:
-      - name: user_data
+      - name: userData
         in: body
         description: Object with user's new password
         required: true

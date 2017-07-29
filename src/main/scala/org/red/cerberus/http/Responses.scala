@@ -4,7 +4,9 @@ import org.red.iris.EveUserData
 
 case class DataResponse[T](data: T)
 
-case class TokenResponse(access_token: String, refresh_token: String)
+case class TokenResponse(accessToken: String, refreshToken: String)
+
+case class AccessTokenResponse(accessToken: String)
 
 case class ErrorResponse(reason: String, code: Int = 1)
 

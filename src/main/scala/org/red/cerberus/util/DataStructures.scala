@@ -17,7 +17,7 @@ case class PrivateClaim(nme: String, id: Int, cid: Long, prm: Long) {
       name = nme,
       id = id,
       characterId = cid,
-      userPermissions = userPermissions
+      permissions = userPermissions
     )
   }
 }
@@ -28,7 +28,7 @@ object PrivateClaim {
       userMini.name,
       userMini.id,
       userMini.characterId,
-      userMini.userPermissions.map(_.bitPosition).fold(0)(_ + 1 << _)
+      userMini.permissions.map(_.bitPosition).fold(0)(_ + 1 << _)
     )
   }
 }

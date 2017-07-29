@@ -20,6 +20,16 @@ import scala.util.{Failure, Success}
 class AuthenticationHandler(permissionList: Future[Seq[PermissionBit]])(implicit ec: ExecutionContext) extends LazyLogging {
 
 
+  def dataResponseFromUserMini(userMini: UserMini): DataResponse[TokenResponse] = {
+
+    DataResponse(
+      TokenResponse(
+        accessToken = this.generateAccessJwt(userMini),
+        refreshToken = this.generateRefreshJwt(userMini)
+      )
+    )
+  }
+
   def authWithCustomJwt(credentials: Option[HttpCredentials]):
   Future[AuthenticationResult[UserMini]] =
     credentials match {
@@ -36,7 +46,6 @@ class AuthenticationHandler(permissionList: Future[Seq[PermissionBit]])(implicit
         logger.error("Missing auth credentials")
         Future(Left(challenge))
     }
-
 
   def generateAccessJwt(userData: UserMini): String = {
     logger.info(s"generating access token for userId=${userData.id}")

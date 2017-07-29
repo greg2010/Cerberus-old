@@ -1,6 +1,5 @@
 package org.red.cerberus.http.endpoints
 
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import org.red.cerberus.util.converters._
@@ -9,18 +8,18 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
 import org.red.cerberus.http._
 import org.red.iris.finagle.clients.UserClient
-import org.red.iris.{LegacyCredentials, SSOCredentials}
+import org.red.iris.LegacyCredentials
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 
 trait Auth
   extends LazyLogging
     with FailFastCirceSupport {
-  def authEndpoints(userClient: UserClient, authenticationHandler: AuthenticationHandler): Route = pathPrefix("auth") {
+  def authEndpoints(userClient: UserClient, authenticationHandler: AuthenticationHandler)
+                   (implicit ec: ExecutionContext): Route = pathPrefix("auth") {
     pathPrefix("api") {
       pathPrefix("legacy") {
-        (get & parameters("key_id", "verification_code", "name".?)) { (keyId, verificationCode, name) =>
+        (get & parameters("keyId", "verificationCode", "name".?)) { (keyId, verificationCode, name) =>
           complete {
             val credentials = LegacyCredentials(keyId.toInt, verificationCode, None, name)
             userClient.getEveUser(credentials)
@@ -30,65 +29,24 @@ trait Auth
       }
     } ~
     pathPrefix("login") {
-      pathPrefix("legacy") {
-        (get & parameters("name_or_email", "password")) { (nameOrEmail, password) =>
+      pathPrefix("sso") {
+        (post & entity(as[SSOLoginReq])) { ssoLoginReq =>
           complete {
-            for {
-              userMini <- userClient.verifyUserLegacy(nameOrEmail, password)
-              res <- Future {
-                DataResponse(
-                  TokenResponse(
-                    access_token = authenticationHandler.generateAccessJwt(userMini),
-                    refresh_token = authenticationHandler.generateRefreshJwt(userMini)
-                  )
-                )
-              }
-            } yield res
+            userClient.loginSSO(ssoLoginReq.authCode)
+              .map(authenticationHandler.dataResponseFromUserMini)
           }
-        } ~
-          (post & entity(as[LegacySignupReq])) { req =>
+        }
+      } /*~
+        pathPrefix("password") {
+          (post & entity(as[PasswordLoginReq])) { passwordLoginReq =>
             complete {
-              userClient.createLegacyUser(req.email,
-                LegacyCredentials(req.key_id.toInt, req.verification_code, None, Some(req.name)), req.password)
-                .map { _ =>
-                HttpResponse(StatusCodes.Created)
-              }
+              userClient.loginPassword(passwordLoginReq.login, passwordLoginReq.password)
+                .map(authenticationHandler.dataResponseFromUserMini)
             }
           }
-      } ~
-        pathPrefix("sso") {
-          (get & parameters("code", "state")) { (code, state) =>
-            complete {
-              StatusCodes.OK
-              // TODO: figure out what to do with this endpoint
-              /*eveApiClient.fetchCredentials(SSOAuthCode(code))
-                .flatMap { res =>
-                  userController.createUser("", None, res)
-                }*/
-            }
-          } ~
-            (get & parameter("token")) { token =>
-              complete {
-                HttpResponse(StatusCodes.OK)
-              }
-            } ~
-            (post & parameters("refresh_token", "email", "password".?)) {
-              (refreshToken, email, password) =>
-                complete {
-                  userClient.createSSOUser(email, SSOCredentials(refreshToken, None), password)
-                  .map { _ =>
-                    HttpResponse(StatusCodes.Created)
-                  }
-                }
-            }
-        } ~
-        pathPrefix("refresh") {
-          (get & parameter("refresh_token")) { refreshToken =>
-            complete {
-              authenticationHandler.extractPayloadFromToken(refreshToken).map(authenticationHandler.generateAccessJwt).map(DataResponse.apply)
-            }
-          }
-        } ~
+        }*/
+
+      /* ~
         pathPrefix("password") {
           (post & entity(as[passwordResetRequestReq])) { passwordResetRequest =>
             complete {
@@ -106,7 +64,7 @@ trait Auth
                   .map(_ => HttpResponse(StatusCodes.NoContent))
               }
             }
-        }
+        }*/
     }
   }
 }

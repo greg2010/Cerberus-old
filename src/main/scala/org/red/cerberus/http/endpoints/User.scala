@@ -29,14 +29,14 @@ trait User
           }
         }
       } ~
-        pathPrefix("password") {
+        /*pathPrefix("password") {
           (put & entity(as[passwordChangeReq])) { passwordChangeRequest =>
             complete {
-              userClient.updatePassword(userData.id, passwordChangeRequest.new_password)
+              userClient.updatePassword(userData.id, passwordChangeRequest.newPassword)
                 .map(_ => HttpResponse(StatusCodes.NoContent))
             }
           }
-        } ~
+        } ~*/
         pathPrefix("teamspeak") {
           put {
             complete {
