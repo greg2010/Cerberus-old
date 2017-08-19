@@ -20,6 +20,16 @@ definitions:
         type: string
       refreshToken:
         type: string
+  SSOLoginResponse:
+    type: object
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
+      currentCharacterId:
+        type: integer
+        format: int64
   EveCharacterInfo:
     type: object
     required:
@@ -86,7 +96,7 @@ paths:
                 type: array
                 items:
                   $ref: "#/definitions/EveCharacterInfo"
-  /auth/login/:
+  /auth/login/sso:
     post:
       operationId: "signInSSO"
       summary: |
@@ -105,7 +115,7 @@ paths:
         200:
           description: OK
           schema:
-            $ref: "#/definitions/TokenResponse"
+            $ref: "#/definitions/SSOLoginResponse"
   /token/refresh:
     get:
       operationId: "refreshAuthToken"
