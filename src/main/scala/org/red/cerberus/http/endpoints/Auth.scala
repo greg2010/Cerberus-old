@@ -33,38 +33,10 @@ trait Auth
         (post & entity(as[SSOLoginReq])) { ssoLoginReq =>
           complete {
             userClient.loginSSO(ssoLoginReq.authCode)
-              .map(authenticationHandler.dataResponseFromUserMini)
+              .map(resp => DataResponse(SSOLoginResponse.fromTokenResponse(authenticationHandler.dataResponseFromUserMini(resp.userMini), resp.currentUser)))
           }
         }
-      } /*~
-        pathPrefix("password") {
-          (post & entity(as[PasswordLoginReq])) { passwordLoginReq =>
-            complete {
-              userClient.loginPassword(passwordLoginReq.login, passwordLoginReq.password)
-                .map(authenticationHandler.dataResponseFromUserMini)
-            }
-          }
-        }*/
-
-      /* ~
-        pathPrefix("password") {
-          (post & entity(as[passwordResetRequestReq])) { passwordResetRequest =>
-            complete {
-              userClient.requestPasswordReset(passwordResetRequest.email)
-                // https://stackoverflow.com/a/33389526
-                .map(_ => HttpResponse(StatusCodes.Accepted))
-            }
-          } ~
-            (put & entity(as[passwordChangeWithTokenReq])) { passwordChangeRequest =>
-              complete {
-                userClient.completePasswordReset(
-                  passwordChangeRequest.email,
-                  passwordChangeRequest.token,
-                  passwordChangeRequest.new_password)
-                  .map(_ => HttpResponse(StatusCodes.NoContent))
-              }
-            }
-        }*/
+      }
     }
   }
 }

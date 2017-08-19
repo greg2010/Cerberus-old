@@ -8,6 +8,16 @@ case class TokenResponse(accessToken: String, refreshToken: String)
 
 case class AccessTokenResponse(accessToken: String)
 
+case class SSOLoginResponse(accessToken: String,
+                            refreshToken: String,
+                            currentCharacterId: Long)
+
+object SSOLoginResponse {
+  def fromTokenResponse(tokenResponse: TokenResponse, currentCharacterId: Long): SSOLoginResponse = {
+    SSOLoginResponse(tokenResponse.accessToken, tokenResponse.refreshToken, currentCharacterId)
+  }
+}
+
 case class ErrorResponse(reason: String, code: Int = 1)
 
 case class EveUserDataResponse(characterId: Long,

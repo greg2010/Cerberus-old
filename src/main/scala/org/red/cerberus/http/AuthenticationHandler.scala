@@ -20,13 +20,10 @@ import scala.util.{Failure, Success}
 class AuthenticationHandler(permissionList: Future[Seq[PermissionBit]])(implicit ec: ExecutionContext) extends LazyLogging {
 
 
-  def dataResponseFromUserMini(userMini: UserMini): DataResponse[TokenResponse] = {
-
-    DataResponse(
-      TokenResponse(
-        accessToken = this.generateAccessJwt(userMini),
-        refreshToken = this.generateRefreshJwt(userMini)
-      )
+  def dataResponseFromUserMini(userMini: UserMini): TokenResponse = {
+    TokenResponse(
+      accessToken = this.generateAccessJwt(userMini),
+      refreshToken = this.generateRefreshJwt(userMini)
     )
   }
 

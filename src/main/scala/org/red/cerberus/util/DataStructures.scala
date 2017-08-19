@@ -5,7 +5,7 @@ import org.red.iris.{PermissionBit, UserMini}
 import scala.concurrent.{ExecutionContext}
 
 
-case class PrivateClaim(nme: String, id: Int, cid: Long, prm: Long) {
+case class PrivateClaim(id: Int, prm: Long) {
   def toUserData(permissionList: Seq[PermissionBit])
                 (implicit ec: ExecutionContext): UserMini = {
     val userPermissions = (for {
@@ -14,9 +14,7 @@ case class PrivateClaim(nme: String, id: Int, cid: Long, prm: Long) {
     } yield permissionList.find(_.bitPosition == i)).flatten
 
     UserMini(
-      name = nme,
       id = id,
-      characterId = cid,
       permissions = userPermissions
     )
   }
@@ -25,9 +23,7 @@ case class PrivateClaim(nme: String, id: Int, cid: Long, prm: Long) {
 object PrivateClaim {
   def fromUserData(userMini: UserMini)(implicit ec: ExecutionContext): PrivateClaim = {
     PrivateClaim(
-      userMini.name,
       userMini.id,
-      userMini.characterId,
       userMini.permissions.map(_.bitPosition).fold(0)(_ + 1 << _)
     )
   }
