@@ -32,6 +32,10 @@ trait Middleware extends LazyLogging with FailFastCirceSupport {
           s"reason=$reason " +
           s"statusCode=$statusCode")
         complete(HttpResponse(StatusCodes.BadRequest, entity = ErrorResponse(s"Error: bad credential", statusCode)))
+      case exc@CCPException(reason) =>
+        logger.error("CCP Exception, " +
+          s"reason=$reason")
+        complete(HttpResponse(StatusCodes.ServiceUnavailable, entity = ErrorResponse("Error: CCP exception")))
       case exc@AccessRestrictedException(reason) =>
         logger.info("Banned user attempted to login")
         complete(HttpResponse(StatusCodes.UnavailableForLegalReasons, entity = ErrorResponse(reason)))
