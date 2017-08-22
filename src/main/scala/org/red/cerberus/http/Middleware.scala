@@ -5,6 +5,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import com.twitter.finagle._
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.red.iris._
@@ -36,6 +37,9 @@ trait Middleware extends LazyLogging with FailFastCirceSupport {
         logger.error("CCP Exception, " +
           s"reason=$reason")
         complete(HttpResponse(StatusCodes.ServiceUnavailable, entity = ErrorResponse("Error: CCP exception")))
+      case exc: IndividualRequestTimeoutException =>
+        logger.error(s"One of the thrift services timed out thriftServiceName=${exc.serviceName}", exc)
+        complete(HttpResponse(StatusCodes.BadGateway, entity = ErrorResponse("Service is not available")))
       case exc@AccessRestrictedException(reason) =>
         logger.info("Banned user attempted to login")
         complete(HttpResponse(StatusCodes.UnavailableForLegalReasons, entity = ErrorResponse(reason)))
