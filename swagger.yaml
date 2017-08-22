@@ -12,6 +12,10 @@ consumes:
 produces:
 - application/json
 
+x-google-endpoints:
+  - name: api.red.greg2010.me
+    allowCors: true
+
 definitions:
   TokenResponse:
     type: object
