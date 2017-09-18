@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext
 
 trait Token extends LazyLogging
   with FailFastCirceSupport {
-  def tokenEndpoints(userClient: UserClient, authenticationHandler: AuthenticationHandler)
+  def tokenEndpoints(userClient: => UserClient, authenticationHandler: => AuthenticationHandler)
                    (implicit ec: ExecutionContext): Route = pathPrefix("token") {
     pathPrefix("refresh") {
       (get & parameter("refreshToken")) { refreshToken =>

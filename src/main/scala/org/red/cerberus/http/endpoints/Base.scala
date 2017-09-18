@@ -27,7 +27,7 @@ trait Base
     with LazyLogging
     with FailFastCirceSupport {
 
-  def baseRoute(userClient: UserClient, teamspeakClient: TeamspeakClient, authenticationHandler: AuthenticationHandler)(address: InetSocketAddress)(implicit ec: ExecutionContext): Route = {
+  def baseRoute(userClient: => UserClient, teamspeakClient: => TeamspeakClient, authenticationHandler: => AuthenticationHandler)(address: InetSocketAddress)(implicit ec: ExecutionContext): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
     accessLog(logger)(system.dispatcher, timeout, materializer) {

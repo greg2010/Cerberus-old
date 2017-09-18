@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext
 trait Auth
   extends LazyLogging
     with FailFastCirceSupport {
-  def authEndpoints(userClient: UserClient, authenticationHandler: AuthenticationHandler)
+  def authEndpoints(userClient: => UserClient, authenticationHandler: => AuthenticationHandler)
                    (implicit ec: ExecutionContext): Route = pathPrefix("auth") {
     pathPrefix("api") {
       pathPrefix("legacy") {

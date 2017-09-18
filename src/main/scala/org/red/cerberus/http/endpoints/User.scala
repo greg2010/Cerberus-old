@@ -20,7 +20,7 @@ import scala.concurrent.ExecutionContext
 trait User
   extends LazyLogging
     with FailFastCirceSupport {
-  def userEndpoints(userClient: UserClient, teamspeakClient: TeamspeakClient)(userData: UserMini, address: InetSocketAddress)(implicit ec: ExecutionContext): Route = pathPrefix("user") {
+  def userEndpoints(userClient: => UserClient, teamspeakClient: => TeamspeakClient)(userData: UserMini, address: InetSocketAddress)(implicit ec: ExecutionContext): Route = pathPrefix("user") {
     pathPrefix("self") {
       pathPrefix("logout") {
         post {
