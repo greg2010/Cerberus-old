@@ -20,15 +20,6 @@ import scala.util.{Failure, Success}
 
 class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: ExecutionContext) extends LazyLogging {
 
-  @tailrec
-  val permissionList: Future[Seq[PermissionBit]] = {
-    def getPermList = permissionClient.getPermissionList
-    getPermList.transformWith {
-      case Success(res) => Future(res)
-      case Failure(ex) => getPermList
-    }
-  }
-
   def dataResponseFromUserMini(userMini: UserMini): TokenResponse = {
     TokenResponse(
       accessToken = this.generateAccessJwt(userMini),
@@ -108,7 +99,7 @@ class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: Exe
     jwtClaim.subject match {
       case Some(sub) =>
         parser.decode[PrivateClaim](sub) match {
-          case Right(privateClaim) => permissionList.map(privateClaim.toUserData)
+          case Right(privateClaim) => permissionClient.getPermissionList.map(privateClaim.toUserData)
           case Left(ex) =>
             logger.error(s"Failed to decode payload ${jwtClaim.subject}", ex)
             Future.failed(ex)
