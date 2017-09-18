@@ -7,6 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.red.cerberus.Implicits._
 import org.red.cerberus.http.AuthenticationHandler
 import org.red.cerberus.http.endpoints.Base
+import org.red.iris.UserMini
 import org.red.iris.finagle.clients.{PermissionClient, TeamspeakClient, UserClient}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,10 +20,7 @@ object Server extends App with LazyLogging with Base {
   val permissionClient = new PermissionClient(config)
   val teamspeakClient = new TeamspeakClient(config)
 
-  lazy val permissionList = permissionClient.getPermissionList
-
-  val authenticationHandler = new AuthenticationHandler(permissionList)
-
+  val authenticationHandler = new AuthenticationHandler(permissionClient)
   val route = this.baseRoute(userClient, teamspeakClient, authenticationHandler) _
   val server = Http().bind(cerberusConfig.getString("host"), cerberusConfig.getInt("port"))
     .runWith(Sink foreach { conn =>

@@ -12,13 +12,22 @@ import org.red.iris.finagle.clients.PermissionClient
 import org.red.iris.{AuthenticationException, PermissionBit, UserMini}
 import pdi.jwt._
 
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success}
 
 
-class AuthenticationHandler(permissionList: Future[Seq[PermissionBit]])(implicit ec: ExecutionContext) extends LazyLogging {
+class AuthenticationHandler(permissionClient: PermissionClient)(implicit ec: ExecutionContext) extends LazyLogging {
 
+  @tailrec
+  val permissionList: Future[Seq[PermissionBit]] = {
+    def getPermList = permissionClient.getPermissionList
+    getPermList.transformWith {
+      case Success(res) => Future(res)
+      case Failure(ex) => getPermList
+    }
+  }
 
   def dataResponseFromUserMini(userMini: UserMini): TokenResponse = {
     TokenResponse(

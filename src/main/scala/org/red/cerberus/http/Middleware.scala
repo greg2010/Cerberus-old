@@ -40,6 +40,9 @@ trait Middleware extends LazyLogging with FailFastCirceSupport {
       case exc: IndividualRequestTimeoutException =>
         logger.error(s"One of the thrift services timed out thriftServiceName=${exc.serviceName}", exc)
         complete(HttpResponse(StatusCodes.BadGateway, entity = ErrorResponse("Service is not available")))
+      case exc: com.twitter.finagle.Failure =>
+        logger.error(s"One of the thrift services is failed cause=${exc.cause}", exc)
+        complete(HttpResponse(StatusCodes.BadGateway, entity = ErrorResponse("Service is not available")))
       case exc@AccessRestrictedException(reason) =>
         logger.info("Banned user attempted to login")
         complete(HttpResponse(StatusCodes.UnavailableForLegalReasons, entity = ErrorResponse(reason)))
