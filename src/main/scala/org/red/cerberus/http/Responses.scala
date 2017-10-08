@@ -18,6 +18,8 @@ object SSOLoginResponse {
   }
 }
 
+case class TeamspeakRegistrationResponse(expectedNickname: String)
+
 case class ErrorResponse(reason: String, code: Int = 1)
 
 case class EveUserDataResponse(characterId: Long,

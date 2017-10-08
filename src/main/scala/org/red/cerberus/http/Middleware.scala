@@ -8,6 +8,7 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import com.twitter.finagle._
 import io.circe.generic.auto._
 import io.circe.syntax._
+import org.red.cerberus.util.exceptions.BadRequestException
 import org.red.iris._
 
 import scala.language.implicitConversions
@@ -46,6 +47,9 @@ trait Middleware extends LazyLogging with FailFastCirceSupport {
       case exc@AccessRestrictedException(reason) =>
         logger.info("Banned user attempted to login")
         complete(HttpResponse(StatusCodes.UnavailableForLegalReasons, entity = ErrorResponse(reason)))
+      case exc: BadRequestException =>
+        logger.info(s"Bad request exception, msg=${exc.reason} errorCode=${exc.errorCode}")
+        complete(HttpResponse(StatusCodes.BadRequest, entity = ErrorResponse(exc.reason, exc.errorCode)))
       case exc: RuntimeException =>
         logger.error(s"Runtime exception caught, msg=${exc.getMessage}", exc)
         complete(HttpResponse(StatusCodes.InternalServerError, entity = ErrorResponse("Internal Server Error")))

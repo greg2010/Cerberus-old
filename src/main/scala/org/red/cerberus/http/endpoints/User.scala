@@ -9,11 +9,13 @@ import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.LazyLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import io.circe.generic.auto._
-import org.red.cerberus.http.passwordChangeReq
+import org.red.cerberus.util.converters._
+import org.red.cerberus.http.{DataResponse, ErrorResponse, TeamspeakRegistrationResponse, passwordChangeReq}
+import org.red.cerberus.util.exceptions.BadRequestException
 import org.red.iris.{ResourceNotFoundException, UserMini}
 import org.red.iris.finagle.clients.{TeamspeakClient, UserClient}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 
 
@@ -29,12 +31,29 @@ trait User
           }
         }
       } ~
-        pathPrefix("teamspeak") {
-          put {
+        pathPrefix("eve") {
+          get {
             complete {
-              userClient.getUser(userData.id).flatMap { user =>
-                teamspeakClient.registerUserOnTeamspeak(user, address.getAddress.getHostAddress)
-              }.map(_ => HttpResponse(StatusCodes.NoContent))
+              userClient.getUser(userData.id).map { user =>
+                val resp = Seq(user.eveUserDataList.head) ++ user.eveUserDataList.tail
+                DataResponse(resp.map(_.toResponse))
+              }
+            }
+          }
+        } ~
+        path(LongNumber) { characterId =>
+          pathPrefix("teamspeak") {
+            put {
+              complete {
+                userClient.getUser(userData.id).flatMap { user =>
+                  if ((user.eveUserDataList.tail :+ user.eveUserDataList.head).exists(_.characterId == characterId)) {
+                    teamspeakClient.registerUserOnTeamspeak(user, characterId, address.getAddress.getHostAddress)
+                      .map(r => DataResponse(TeamspeakRegistrationResponse(r)))
+                  } else {
+                    Future.failed(BadRequestException("Account doesn't own such eve user"))
+                  }
+                }
+              }
             }
           }
         }

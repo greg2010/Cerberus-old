@@ -62,7 +62,13 @@ definitions:
         type: string
       allianceTicker:
         type: string
-
+  ErrorResponse:
+    type: object
+    properties:
+      reason:
+        type: string
+      code:
+        type: integer
 
 paths:
   /auth/api/legacy:
@@ -141,45 +147,6 @@ paths:
             properties:
               accessToken:
                 type: string
-#  /auth/password:
-#    post:
-#      operationId: "request_password_reset"
-#      summary: |
-#        Requests password reset for user by email
-#      parameters:
-#      - name: user_data
-#        in: body
-#        description: Object with user's email
-#        required: true
-#        schema:
-#          type: object
-#          properties:
-#            email:
-#              type: string
-#      responses:
-#        202:
-#          description: Request accepted
-#    put:
-#      operationId: "password_change_with_token"
-#      summary: |
-#        Resets user password using token for authorization
-#      parameters:
-#      - name: user_data
-#        in: body
-#        description: Object with user's new password email and token
-#        required: true
-#        schema:
-#          type: object
-#          properties:
-#            email:
-#              type: string
-#            token:
-#              type: string
-#            new_password:
-#              type: string
-#      responses:
-#        204:
-#          description: Password succesffuly reset
   /user/self/logout:
     post:
       operationId: "logout"
@@ -191,14 +158,46 @@ paths:
       responses:
         200:
           description: Successful response
-  /user/self/teamspeak:
+  /user/self/{characterId}/teamspeak:
     put:
       operationId: "tsRegister"
       summary: |
         Registers on teamspeak
+      parameters:
+        - in: path
+          name: characterId
+          type: integer
+          required: true
+          description: EvE character id to generate expected nickname
       responses:
-        202:
-          description: Request accepted
+        200:
+          description: Request accepted and/or user registered
+          schema:
+            properties:
+              data:
+                type: object
+                properties:
+                  expectedNickname:
+                    type: string
+        400:
+          description: Returned if account doesn't own character id supplied
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+  /user/self/eve:
+    get:
+      operationId: "charactersGet"
+      summary: |
+        Returns list of valid eve characters for the account
+      responses:
+        200:
+          description: Successful response
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: "#/definitions/EveCharacterInfo"
   /user/self/password:
     put:
       operationId: "passwordChange"
