@@ -41,7 +41,7 @@ trait User
             }
           }
         } ~
-        path(LongNumber) { characterId =>
+        pathPrefix(LongNumber) { characterId =>
           pathPrefix("teamspeak") {
             put {
               complete {
