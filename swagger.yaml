@@ -158,13 +158,37 @@ paths:
       responses:
         200:
           description: Successful response
-  /user/self/{characterId}/teamspeak:
+  /user/self/teamspeak:
+    get:
+      operationId: "teamspeakRegistrationGet"
+      summary: |
+        Returns information about teamspeak registration for the user
+      responses:
+        200:
+          description: Successful response
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  characterId:
+                    type: integer
+                  expectedNickname:
+                    type: string
+        404:
+          description: Registration not found
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
     put:
       operationId: "tsRegister"
       summary: |
         Registers on teamspeak
       parameters:
-        - in: path
+        - in: query
           name: characterId
           type: integer
           required: true
@@ -181,6 +205,17 @@ paths:
                     type: string
         400:
           description: Returned if account doesn't own character id supplied
+          schema:
+            $ref: "#/definitions/ErrorResponse"
+    delete:
+      operationId: "tsRegisterDelete"
+      summary: |
+        Deletes registration on teamspeak
+      responses:
+        200:
+          description: Registration deleted
+        404:
+          description: Returned if account doesn't have teamspeak registration
           schema:
             $ref: "#/definitions/ErrorResponse"
   /user/self/eve:

@@ -41,9 +41,11 @@ trait User
             }
           }
         } ~
-        pathPrefix(LongNumber) { characterId =>
           pathPrefix("teamspeak") {
-            put {
+            get {
+              complete {HttpResponse(status = StatusCodes.OK)}
+            } ~
+            (put & parameter("characterId".as[Long])) { characterId =>
               complete {
                 userClient.getUser(userData.id).flatMap { user =>
                   if ((user.eveUserDataList.tail :+ user.eveUserDataList.head).exists(_.characterId == characterId)) {
@@ -53,9 +55,11 @@ trait User
                     Future.failed(BadRequestException("Account doesn't own such eve user"))
                   }
                 }
-              }
             }
-          }
+          } ~
+            delete {
+              complete {HttpResponse(status = StatusCodes.OK)}
+            }
         }
     }
   }
