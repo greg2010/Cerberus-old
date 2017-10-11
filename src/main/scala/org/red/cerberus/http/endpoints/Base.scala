@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.{RejectionHandler, Route}
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
 import org.red.cerberus.Implicits._
 import org.red.cerberus._
@@ -27,12 +28,12 @@ trait Base
     with LazyLogging
     with FailFastCirceSupport {
 
-  def baseRoute(userClient: => UserClient, teamspeakClient: => TeamspeakClient, authenticationHandler: => AuthenticationHandler)(address: InetSocketAddress)(implicit ec: ExecutionContext): Route = {
+  def baseRoute(corsSettings: CorsSettings, userClient: => UserClient, teamspeakClient: => TeamspeakClient, authenticationHandler: => AuthenticationHandler)(address: InetSocketAddress)(implicit ec: ExecutionContext): Route = {
     val rejectionHandler = corsRejectionHandler withFallback RejectionHandler.default
     val handleErrors = handleRejections(rejectionHandler) & handleExceptions(exceptionHandler)
     accessLog(logger)(system.dispatcher, timeout, materializer) {
       handleErrors {
-        cors() {
+        cors(corsSettings) {
           handleErrors {
             pathPrefix(cerberusConfig.getString("basePath")) {
               tokenEndpoints(userClient, authenticationHandler) ~
